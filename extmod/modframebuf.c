@@ -151,14 +151,7 @@ static uint32_t rgb565_bs_getpixel(const mp_obj_framebuf_t *fb, unsigned int x, 
 }
 
 static void rgb565_bs_fill_rect(const mp_obj_framebuf_t *fb, unsigned int x, unsigned int y, unsigned int w, unsigned int h, uint32_t col) {
-    col = __builtin_bswap16(col);
-    uint16_t *b = &((uint16_t *)fb->buf)[x + y * fb->stride];
-    while (h--) {
-        for (unsigned int ww = w; ww; --ww) {
-            *b++ = col;
-        }
-        b += fb->stride - w;
-    }
+    rgb565_fill_rect(fb, x, y, w, h, __builtin_bswap16(col));
 }
 
 // Functions for GS2_HMSB format
