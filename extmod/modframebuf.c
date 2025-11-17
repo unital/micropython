@@ -119,6 +119,9 @@ static void mvlsb_fill_rect(const mp_obj_framebuf_t *fb, unsigned int x, unsigne
 }
 
 // Functions for RGB565 and RGB565_BS format
+//
+// Internally we use 'native' and 'byte-swapped' formats, and then expose those as big- or little-
+// endian to Python as appropriate.
 
 static void rgb565_setpixel(const mp_obj_framebuf_t *fb, unsigned int x, unsigned int y, uint32_t col) {
     ((uint16_t *)fb->buf)[x + y * fb->stride] = col;
@@ -925,7 +928,13 @@ static const mp_rom_map_elem_t framebuf_module_globals_table[] = {
     { MP_ROM_QSTR(MP_QSTR_MVLSB), MP_ROM_INT(FRAMEBUF_MVLSB) },
     { MP_ROM_QSTR(MP_QSTR_MONO_VLSB), MP_ROM_INT(FRAMEBUF_MVLSB) },
     { MP_ROM_QSTR(MP_QSTR_RGB565), MP_ROM_INT(FRAMEBUF_RGB565) },
-    { MP_ROM_QSTR(MP_QSTR_RGB565_BS), MP_ROM_INT(FRAMEBUF_RGB565_BS) },
+#if MP_ENDIANNESS_LITTLE
+    { MP_ROM_QSTR(MP_QSTR_RGB565_LE), MP_ROM_INT(FRAMEBUF_RGB565) },
+    { MP_ROM_QSTR(MP_QSTR_RGB565_BE), MP_ROM_INT(FRAMEBUF_RGB565_BS) },
+#elif MP_ENDIANNESS_BIG
+    { MP_ROM_QSTR(MP_QSTR_RGB565_BE), MP_ROM_INT(FRAMEBUF_RGB565) },
+    { MP_ROM_QSTR(MP_QSTR_RGB565_LE), MP_ROM_INT(FRAMEBUF_RGB565_BS) },
+#endif // MP_ENDIANNESS_...
     { MP_ROM_QSTR(MP_QSTR_GS2_HMSB), MP_ROM_INT(FRAMEBUF_GS2_HMSB) },
     { MP_ROM_QSTR(MP_QSTR_GS4_HMSB), MP_ROM_INT(FRAMEBUF_GS4_HMSB) },
     { MP_ROM_QSTR(MP_QSTR_GS8), MP_ROM_INT(FRAMEBUF_GS8) },

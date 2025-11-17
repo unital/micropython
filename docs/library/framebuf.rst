@@ -192,13 +192,20 @@ Constants
 
 .. data:: framebuf.RGB565
 
-    Red Green Blue (16-bit, 5+6+5) color format
+    Red Green Blue (16-bit, 5+6+5, native) color format in native byte-order.
 
-.. data:: framebuf.RGB565_BS
+.. data:: framebuf.RGB565_LE
 
-    Red Green Blue (16-bit, 5+6+5, byte-swapped) color format
-    This defines a 16-bit format where the bytes are stored in memory with
-    opposite endianness to the native endianness.
+    Red Green Blue (16-bit, 5+6+5, little-endian) color format in little-endian
+    byte order.  This defines a 16-bit format where the bytes are stored in
+    little-endian order. If the system is little-endian, this is the same as
+    ``RGB565``.
+
+.. data:: framebuf.RGB565_BE
+
+    Red Green Blue (16-bit, 5+6+5, big-endian) color format in big-endian byte
+    order.  This defines a 16-bit format where the bytes are stored in
+    big-endian order. If the system is big-endian, this is the same as ``RGB565``.
 
 .. data:: framebuf.GS2_HMSB
 

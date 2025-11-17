@@ -280,7 +280,6 @@ tests_requiring_slice = (
     "extmod/btree1.py",
     "extmod/deflate_decompress.py",
     "extmod/framebuf16.py",
-    "extmod/framebuf16_bs.py",
     "extmod/framebuf4.py",
     "extmod/machine1.py",
     "extmod/time_mktime.py",
