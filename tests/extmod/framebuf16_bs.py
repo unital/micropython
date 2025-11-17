@@ -52,7 +52,7 @@ printbuf()
 w2 = 2
 h2 = 3
 buf2 = bytearray(w2 * h2 * 2)
-fbuf2 = framebuf.FrameBuffer(buf2, w2, h2, framebuf.RGB565)
+fbuf2 = framebuf.FrameBuffer(buf2, w2, h2, framebuf.RGB565_BS)
 
 fbuf2.fill(0x0000)
 fbuf2.pixel(0, 0, 0x0EE0)
