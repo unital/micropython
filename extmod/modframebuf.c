@@ -118,7 +118,7 @@ static void mvlsb_fill_rect(const mp_obj_framebuf_t *fb, unsigned int x, unsigne
     }
 }
 
-// Functions for RGB565 format
+// Functions for RGB565 and RGB565_BS format
 
 static void rgb565_setpixel(const mp_obj_framebuf_t *fb, unsigned int x, unsigned int y, uint32_t col) {
     ((uint16_t *)fb->buf)[x + y * fb->stride] = col;
@@ -127,18 +127,6 @@ static void rgb565_setpixel(const mp_obj_framebuf_t *fb, unsigned int x, unsigne
 static uint32_t rgb565_getpixel(const mp_obj_framebuf_t *fb, unsigned int x, unsigned int y) {
     return ((uint16_t *)fb->buf)[x + y * fb->stride];
 }
-
-static void rgb565_fill_rect(const mp_obj_framebuf_t *fb, unsigned int x, unsigned int y, unsigned int w, unsigned int h, uint32_t col) {
-    uint16_t *b = &((uint16_t *)fb->buf)[x + y * fb->stride];
-    while (h--) {
-        for (unsigned int ww = w; ww; --ww) {
-            *b++ = col;
-        }
-        b += fb->stride - w;
-    }
-}
-
-// Functions for RGB565_BS format
 
 static void rgb565_bs_setpixel(const mp_obj_framebuf_t *fb, unsigned int x, unsigned int y, uint32_t col) {
     col = __builtin_bswap16(col);
@@ -150,8 +138,17 @@ static uint32_t rgb565_bs_getpixel(const mp_obj_framebuf_t *fb, unsigned int x, 
     return __builtin_bswap16(col);
 }
 
-static void rgb565_bs_fill_rect(const mp_obj_framebuf_t *fb, unsigned int x, unsigned int y, unsigned int w, unsigned int h, uint32_t col) {
-    rgb565_fill_rect(fb, x, y, w, h, __builtin_bswap16(col));
+static void rgb565_fill_rect(const mp_obj_framebuf_t *fb, unsigned int x, unsigned int y, unsigned int w, unsigned int h, uint32_t col) {
+    if (fb->format == FRAMEBUF_RGB565_BS) {
+        col = __builtin_bswap16(col);
+    }
+    uint16_t *b = &((uint16_t *)fb->buf)[x + y * fb->stride];
+    while (h--) {
+        for (unsigned int ww = w; ww; --ww) {
+            *b++ = col;
+        }
+        b += fb->stride - w;
+    }
 }
 
 // Functions for GS2_HMSB format
@@ -251,7 +248,7 @@ static void gs8_fill_rect(const mp_obj_framebuf_t *fb, unsigned int x, unsigned 
 static mp_framebuf_p_t formats[] = {
     [FRAMEBUF_MVLSB] = {mvlsb_setpixel, mvlsb_getpixel, mvlsb_fill_rect},
     [FRAMEBUF_RGB565] = {rgb565_setpixel, rgb565_getpixel, rgb565_fill_rect},
-    [FRAMEBUF_RGB565_BS] = {rgb565_bs_setpixel, rgb565_bs_getpixel, rgb565_bs_fill_rect},
+    [FRAMEBUF_RGB565_BS] = {rgb565_bs_setpixel, rgb565_bs_getpixel, rgb565_fill_rect},
     [FRAMEBUF_GS2_HMSB] = {gs2_hmsb_setpixel, gs2_hmsb_getpixel, gs2_hmsb_fill_rect},
     [FRAMEBUF_GS4_HMSB] = {gs4_hmsb_setpixel, gs4_hmsb_getpixel, gs4_hmsb_fill_rect},
     [FRAMEBUF_GS8] = {gs8_setpixel, gs8_getpixel, gs8_fill_rect},
