@@ -335,6 +335,7 @@ static mp_obj_t framebuf_make_new_helper(size_t n_args, const mp_obj_t *args_in,
             bpp = 8;
             break;
         case FRAMEBUF_RGB565:
+        case FRAMEBUF_RGB565_BS:
             bpp = 16;
             break;
         default:
