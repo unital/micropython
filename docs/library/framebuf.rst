@@ -194,6 +194,12 @@ Constants
 
     Red Green Blue (16-bit, 5+6+5) color format
 
+.. data:: framebuf.RGB565_BS
+
+    Red Green Blue (16-bit, 5+6+5, byte-swapped) color format
+    This defines a 16-bit format where the bytes are stored in memory with
+    opposite endianness to the native endianness.
+
 .. data:: framebuf.GS2_HMSB
 
     Grayscale (2-bit) color format
