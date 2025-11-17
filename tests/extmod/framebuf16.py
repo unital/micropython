@@ -4,9 +4,7 @@ except ImportError:
     print("SKIP")
     raise SystemExit
 
-if (
-    sys.byteorder == "little" and framebuf.RGB565 == framebuf.RGB565_LE
-) or (
+if (sys.byteorder == "little" and framebuf.RGB565 == framebuf.RGB565_LE) or (
     sys.byteorder == "big" and framebuf.RGB565 == framebuf.RGB565_BE
 ):
     print("Native format matches expected value.")
