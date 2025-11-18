@@ -50,6 +50,7 @@ mp_obj_t mpy_init(mp_obj_fun_bc_t *self, size_t n_args, size_t n_kw, mp_obj_t *a
     mp_store_global(MP_QSTR_GS8, MP_OBJ_NEW_SMALL_INT(FRAMEBUF_GS8));
     mp_store_global(MP_QSTR_MONO_HLSB, MP_OBJ_NEW_SMALL_INT(FRAMEBUF_MHLSB));
     mp_store_global(MP_QSTR_MONO_HMSB, MP_OBJ_NEW_SMALL_INT(FRAMEBUF_MHMSB));
+    mp_store_global(MP_QSTR_ALPHA, MP_OBJ_NEW_SMALL_INT(MICROPY_PY_FRAMEBUF_ALPHA));
 
     MP_DYNRUNTIME_INIT_EXIT
 }
