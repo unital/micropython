@@ -803,8 +803,8 @@ static mp_obj_t framebuf_blit(size_t n_args, const mp_obj_t *args_in) {
     // Clip.
     int x0 = MAX(0, x);
     int y0 = MAX(0, y);
-    int x1 = MAX(0, -x);
-    int y1 = MAX(0, -y);
+    mp_int_t x1 = MAX(0, -x);
+    mp_int_t y1 = MAX(0, -y);
     int x0end = MIN(self->width, x + source.width);
     int y0end = MIN(self->height, y + source.height);
 
@@ -840,7 +840,7 @@ static mp_obj_t framebuf_blit(size_t n_args, const mp_obj_t *args_in) {
     }
 
     for (; y0 < y0end; ++y0) {
-        int cx1 = x1;
+        mp_int_t cx1 = x1;
         for (int cx0 = x0; cx0 < x0end; ++cx0) {
             uint32_t col = getpixel(&source, cx1, y1);
             if (palette.buf) {
