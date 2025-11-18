@@ -255,6 +255,47 @@ static inline uint32_t getpixel(const mp_obj_framebuf_t *fb, unsigned int x, uns
     return formats[fb->format].getpixel(fb, x, y);
 }
 
+typedef struct __attribute__((packed)) rgb565 {
+    uint8_t b:5;
+    uint8_t g:6;
+    uint8_t r:5;
+} rgb565;
+typedef union {
+    uint16_t u16;
+    rgb565 rgb;
+} urgb565;
+
+static uint32_t alpha_blend(uint32_t c1, uint32_t c2, uint32_t alpha) {
+    // Add one to alpha, otherwise 0x00 and 0x01 are identical after >> 8
+    return ((c1 * (0x100 - alpha)) + (alpha + 1) * c2) >> 8;
+}
+
+static void setpixel_alpha(const mp_obj_framebuf_t *fb, mp_int_t x, mp_int_t y, mp_int_t col, mp_int_t alpha) {
+    if (alpha <= 0) {
+        // nothing to do
+        return;
+    } else if (alpha >= 0xff) {
+        // no blending needed
+        setpixel(fb, x, y, col);
+    }
+    uint16_t pix_col = formats[fb->format].getpixel(fb, x, y);
+    if (fb->format == FRAMEBUF_RGB565) {
+        uint16_t col16 = col;
+        urgb565 pix_col_struct = *(urgb565 *)&pix_col;
+        urgb565 col_struct = *(urgb565 *)&col16;
+        col_struct.rgb.r = alpha_blend(pix_col_struct.rgb.r, col_struct.rgb.r, alpha);
+        col_struct.rgb.g = alpha_blend(pix_col_struct.rgb.g, col_struct.rgb.g, alpha);
+        col_struct.rgb.b = alpha_blend(pix_col_struct.rgb.b, col_struct.rgb.b, alpha);
+        col_struct.rgb.r = MIN(col_struct.rgb.r, 0b11111);
+        col_struct.rgb.g = MIN(col_struct.rgb.g, 0b111111);
+        col_struct.rgb.b = MIN(col_struct.rgb.b, 0b11111);
+        col = *(uint16_t *)&col_struct;
+    } else {
+        col = alpha_blend(pix_col, col, alpha);
+    }
+    formats[fb->format].setpixel(fb, x, y, col);
+}
+
 static void fill_rect(const mp_obj_framebuf_t *fb, int x, int y, int w, int h, uint32_t col) {
     if (h < 1 || w < 1 || x + w <= 0 || y + h <= 0 || y >= fb->height || x >= fb->width) {
         // No operation needed.
@@ -780,6 +821,83 @@ static mp_obj_t framebuf_blit(size_t n_args, const mp_obj_t *args_in) {
     return mp_const_none;
 }
 static MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(framebuf_blit_obj, 4, 6, framebuf_blit);
+
+static mp_obj_t framebuf_blit_mask(size_t n_args, const mp_obj_t *args_in) {
+    mp_obj_framebuf_t *self = MP_OBJ_TO_PTR(args_in[0]);
+
+    mp_obj_framebuf_t source;
+    get_readonly_framebuffer(args_in[1], &source);
+
+    mp_int_t x = mp_obj_get_int(args_in[2]);
+    mp_int_t y = mp_obj_get_int(args_in[3]);
+
+    mp_obj_framebuf_t mask;
+    get_readonly_framebuffer(args_in[4], &mask);
+    if (mask.width != source.width || mask.height != source.height) {
+        // mask and source must be the same shape
+        mp_raise_ValueError(MP_ERROR_TEXT("Mask and source different sizes."));
+    }
+    size_t alpha_mul;
+    switch (mask.format) {
+        case FRAMEBUF_MVLSB:
+        case FRAMEBUF_MHLSB:
+        case FRAMEBUF_MHMSB:
+            alpha_mul = 0x100;
+            break;
+        case FRAMEBUF_GS8:
+            alpha_mul = 1;
+            break;
+        case FRAMEBUF_GS4_HMSB:
+            alpha_mul = 0x11;
+            break;
+        case FRAMEBUF_GS2_HMSB:
+            alpha_mul = 0x1111;
+            break;
+        default:
+            // other formats can't easily be converted to alpha
+            mp_raise_ValueError(MP_ERROR_TEXT("invalid mask format"));
+    }
+
+    mp_obj_framebuf_t palette;
+    palette.buf = NULL;
+    if (n_args > 5 && args_in[5] != mp_const_none) {
+        get_readonly_framebuffer(args_in[5], &palette);
+    }
+
+    if (
+        (x >= self->width) ||
+        (y >= self->height) ||
+        (-x >= source.width) ||
+        (-y >= source.height)
+        ) {
+        // Out of bounds, no-op.
+        return mp_const_none;
+    }
+
+    // Clip.
+    int x0 = MAX(0, x);
+    int y0 = MAX(0, y);
+    int x1 = MAX(0, -x);
+    int y1 = MAX(0, -y);
+    int x0end = MIN(self->width, x + source.width);
+    int y0end = MIN(self->height, y + source.height);
+
+    for (; y0 < y0end; ++y0) {
+        int cx1 = x1;
+        for (int cx0 = x0; cx0 < x0end; ++cx0) {
+            uint32_t col = getpixel(&source, cx1, y1);
+            if (palette.buf) {
+                col = getpixel(&palette, col, 0);
+            }
+            uint32_t alpha = getpixel(&mask, cx1, y1) * alpha_mul;
+            setpixel_alpha(self, cx0, y0, col, alpha);
+            ++cx1;
+        }
+        ++y1;
+    }
+    return mp_const_none;
+}
+static MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(framebuf_blit_mask_obj, 5, 6, framebuf_blit_mask);
 
 static mp_obj_t framebuf_scroll(mp_obj_t self_in, mp_obj_t xstep_in, mp_obj_t ystep_in) {
     mp_obj_framebuf_t *self = MP_OBJ_TO_PTR(self_in);
