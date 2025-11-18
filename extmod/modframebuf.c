@@ -850,7 +850,9 @@ static mp_obj_t framebuf_blit(size_t n_args, const mp_obj_t *args_in) {
             if (palette.buf) {
                 col = getpixel(&palette, col, 0);
             }
-            alpha = getpixel(&mask, cx1, y1) * alpha_mul;
+            if (alpha_mul) {
+                alpha = getpixel(&mask, cx1, y1) * alpha_mul;
+            }
             if (col != (uint32_t)key) {
                 setpixel_alpha(self, cx0, y0, col, alpha);
             }
