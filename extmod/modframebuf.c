@@ -256,9 +256,9 @@ static inline uint32_t getpixel(const mp_obj_framebuf_t *fb, unsigned int x, uns
 }
 
 typedef struct __attribute__((packed)) rgb565 {
-    uint8_t b:5;
-    uint8_t g:6;
-    uint8_t r:5;
+    uint8_t b : 5;
+    uint8_t g : 6;
+    uint8_t r : 5;
 } rgb565;
 typedef union {
     uint16_t u16;
@@ -996,6 +996,7 @@ static const mp_rom_map_elem_t framebuf_locals_dict_table[] = {
     { MP_ROM_QSTR(MP_QSTR_poly), MP_ROM_PTR(&framebuf_poly_obj) },
     #endif
     { MP_ROM_QSTR(MP_QSTR_blit), MP_ROM_PTR(&framebuf_blit_obj) },
+    { MP_ROM_QSTR(MP_QSTR_blit_mask), MP_ROM_PTR(&framebuf_blit_mask_obj) },
     { MP_ROM_QSTR(MP_QSTR_scroll), MP_ROM_PTR(&framebuf_scroll_obj) },
     { MP_ROM_QSTR(MP_QSTR_text), MP_ROM_PTR(&framebuf_text_obj) },
 };
