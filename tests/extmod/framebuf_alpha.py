@@ -1,6 +1,7 @@
 # Test FrameBuffer.blit method.
 
 import sys
+
 try:
     import framebuf
 except ImportError:
@@ -32,7 +33,7 @@ buf = bytearray(w * h)
 fbuf = framebuf.FrameBuffer(buf, w, h, framebuf.GS8)
 
 fbuf2 = framebuf.FrameBuffer(bytearray(4), 2, 2, framebuf.GS8)
-fbuf2.fill(0x7f)
+fbuf2.fill(0x7F)
 
 # Blit another FrameBuffer, at various locations with alpha.
 for x, y in ((-1, -1), (0, 0), (1, 1), (4, 3)):
@@ -41,8 +42,13 @@ for x, y in ((-1, -1), (0, 0), (1, 1), (4, 3)):
     printbuf()
 
 # Blit another FrameBuffer, with alpha mask.
-alphas = [[0, 0x3f], [0x7f, 0xff]]
-for bpp, format in [(8, framebuf.GS8), (4, framebuf.GS4_HMSB), (2, framebuf.GS2_HMSB), (1, framebuf.MONO_HLSB)]:
+alphas = [[0, 0x3F], [0x7F, 0xFF]]
+for bpp, format in [
+    (8, framebuf.GS8),
+    (4, framebuf.GS4_HMSB),
+    (2, framebuf.GS2_HMSB),
+    (1, framebuf.MONO_HLSB),
+]:
     mask = framebuf.FrameBuffer(bytearray(4), 2, 2, format)
     for x in [0, 1]:
         for y in [0, 1]:
@@ -53,14 +59,19 @@ for bpp, format in [(8, framebuf.GS8), (4, framebuf.GS4_HMSB), (2, framebuf.GS2_
     printbuf()
 
 # Blit another FrameBuffer, with alpha mask, non-black background.
-alphas = [[0, 0x3f], [0x7f, 0xff]]
-for bpp, format in [(8, framebuf.GS8), (4, framebuf.GS4_HMSB), (2, framebuf.GS2_HMSB), (1, framebuf.MONO_HLSB)]:
+alphas = [[0, 0x3F], [0x7F, 0xFF]]
+for bpp, format in [
+    (8, framebuf.GS8),
+    (4, framebuf.GS4_HMSB),
+    (2, framebuf.GS2_HMSB),
+    (1, framebuf.MONO_HLSB),
+]:
     mask = framebuf.FrameBuffer(bytearray(4), 2, 2, format)
     for x in [0, 1]:
         for y in [0, 1]:
             mask.pixel(x, y, alphas[x][y] >> (8 - bpp))
 
-    fbuf.fill(0xef)
+    fbuf.fill(0xEF)
     fbuf.blit(fbuf2, 1, 1, -1, None, mask)
     printbuf()
 
@@ -78,8 +89,13 @@ for x, y in ((-1, -1), (0, 0), (1, 1), (4, 3)):
     printbuf(2)
 
 # Blit a color FrameBuffer, with alpha mask.
-alphas = [[0, 0x3f], [0x7f, 0xff]]
-for bpp, format in [(8, framebuf.GS8), (4, framebuf.GS4_HMSB), (2, framebuf.GS2_HMSB), (1, framebuf.MONO_HLSB)]:
+alphas = [[0, 0x3F], [0x7F, 0xFF]]
+for bpp, format in [
+    (8, framebuf.GS8),
+    (4, framebuf.GS4_HMSB),
+    (2, framebuf.GS2_HMSB),
+    (1, framebuf.MONO_HLSB),
+]:
     mask = framebuf.FrameBuffer(bytearray(4), 2, 2, format)
     for x in [0, 1]:
         for y in [0, 1]:
@@ -90,8 +106,13 @@ for bpp, format in [(8, framebuf.GS8), (4, framebuf.GS4_HMSB), (2, framebuf.GS2_
     printbuf(2)
 
 # Blit a color FrameBuffer, with alpha mask, non-black background.
-alphas = [[0, 0x3f], [0x7f, 0xff]]
-for bpp, format in [(8, framebuf.GS8), (4, framebuf.GS4_HMSB), (2, framebuf.GS2_HMSB), (1, framebuf.MONO_HLSB)]:
+alphas = [[0, 0x3F], [0x7F, 0xFF]]
+for bpp, format in [
+    (8, framebuf.GS8),
+    (4, framebuf.GS4_HMSB),
+    (2, framebuf.GS2_HMSB),
+    (1, framebuf.MONO_HLSB),
+]:
     mask = framebuf.FrameBuffer(bytearray(4), 2, 2, format)
     for x in [0, 1]:
         for y in [0, 1]:
