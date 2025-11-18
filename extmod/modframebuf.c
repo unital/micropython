@@ -776,9 +776,39 @@ static mp_obj_t framebuf_blit(size_t n_args, const mp_obj_t *args_in) {
 
     mp_int_t x = mp_obj_get_int(args_in[2]);
     mp_int_t y = mp_obj_get_int(args_in[3]);
+
     mp_int_t key = -1;
+    size_t alpha_mul = 0;
+    mp_obj_framebuf_t mask;
     if (n_args > 4) {
-        key = mp_obj_get_int(args_in[4]);
+        if (mp_obj_get_type(args_in[4]) == &mp_type_int) {
+            key = mp_obj_get_int(args_in[4]);
+        } else {
+            get_readonly_framebuffer(args_in[4], &mask);
+            if (mask.width != source.width || mask.height != source.height) {
+                // mask and source must be the same shape
+                mp_raise_ValueError(MP_ERROR_TEXT("Mask and source different sizes."));
+            }
+            switch (mask.format) {
+                case FRAMEBUF_MVLSB:
+                case FRAMEBUF_MHLSB:
+                case FRAMEBUF_MHMSB:
+                    alpha_mul = 0x100;
+                    break;
+                case FRAMEBUF_GS8:
+                    alpha_mul = 1;
+                    break;
+                case FRAMEBUF_GS4_HMSB:
+                    alpha_mul = 0x11;
+                    break;
+                case FRAMEBUF_GS2_HMSB:
+                    alpha_mul = 0x1111;
+                    break;
+                default:
+                    // other formats can't easily be converted to alpha
+                    mp_raise_ValueError(MP_ERROR_TEXT("invalid mask format"));
+            }
+        }
     }
     mp_obj_framebuf_t palette;
     palette.buf = NULL;
@@ -811,7 +841,10 @@ static mp_obj_t framebuf_blit(size_t n_args, const mp_obj_t *args_in) {
             if (palette.buf) {
                 col = getpixel(&palette, col, 0);
             }
-            if (col != (uint32_t)key) {
+            if (alpha_mul) {
+                uint32_t alpha = getpixel(&mask, cx1, y1) * alpha_mul;
+                setpixel_alpha(self, cx0, y0, col, alpha);
+            } else if (col != (uint32_t)key) {
                 setpixel(self, cx0, y0, col);
             }
             ++cx1;
@@ -821,83 +854,6 @@ static mp_obj_t framebuf_blit(size_t n_args, const mp_obj_t *args_in) {
     return mp_const_none;
 }
 static MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(framebuf_blit_obj, 4, 6, framebuf_blit);
-
-static mp_obj_t framebuf_blit_mask(size_t n_args, const mp_obj_t *args_in) {
-    mp_obj_framebuf_t *self = MP_OBJ_TO_PTR(args_in[0]);
-
-    mp_obj_framebuf_t source;
-    get_readonly_framebuffer(args_in[1], &source);
-
-    mp_int_t x = mp_obj_get_int(args_in[2]);
-    mp_int_t y = mp_obj_get_int(args_in[3]);
-
-    mp_obj_framebuf_t mask;
-    get_readonly_framebuffer(args_in[4], &mask);
-    if (mask.width != source.width || mask.height != source.height) {
-        // mask and source must be the same shape
-        mp_raise_ValueError(MP_ERROR_TEXT("Mask and source different sizes."));
-    }
-    size_t alpha_mul;
-    switch (mask.format) {
-        case FRAMEBUF_MVLSB:
-        case FRAMEBUF_MHLSB:
-        case FRAMEBUF_MHMSB:
-            alpha_mul = 0x100;
-            break;
-        case FRAMEBUF_GS8:
-            alpha_mul = 1;
-            break;
-        case FRAMEBUF_GS4_HMSB:
-            alpha_mul = 0x11;
-            break;
-        case FRAMEBUF_GS2_HMSB:
-            alpha_mul = 0x1111;
-            break;
-        default:
-            // other formats can't easily be converted to alpha
-            mp_raise_ValueError(MP_ERROR_TEXT("invalid mask format"));
-    }
-
-    mp_obj_framebuf_t palette;
-    palette.buf = NULL;
-    if (n_args > 5 && args_in[5] != mp_const_none) {
-        get_readonly_framebuffer(args_in[5], &palette);
-    }
-
-    if (
-        (x >= self->width) ||
-        (y >= self->height) ||
-        (-x >= source.width) ||
-        (-y >= source.height)
-        ) {
-        // Out of bounds, no-op.
-        return mp_const_none;
-    }
-
-    // Clip.
-    int x0 = MAX(0, x);
-    int y0 = MAX(0, y);
-    int x1 = MAX(0, -x);
-    int y1 = MAX(0, -y);
-    int x0end = MIN(self->width, x + source.width);
-    int y0end = MIN(self->height, y + source.height);
-
-    for (; y0 < y0end; ++y0) {
-        int cx1 = x1;
-        for (int cx0 = x0; cx0 < x0end; ++cx0) {
-            uint32_t col = getpixel(&source, cx1, y1);
-            if (palette.buf) {
-                col = getpixel(&palette, col, 0);
-            }
-            uint32_t alpha = getpixel(&mask, cx1, y1) * alpha_mul;
-            setpixel_alpha(self, cx0, y0, col, alpha);
-            ++cx1;
-        }
-        ++y1;
-    }
-    return mp_const_none;
-}
-static MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(framebuf_blit_mask_obj, 5, 6, framebuf_blit_mask);
 
 static mp_obj_t framebuf_scroll(mp_obj_t self_in, mp_obj_t xstep_in, mp_obj_t ystep_in) {
     mp_obj_framebuf_t *self = MP_OBJ_TO_PTR(self_in);
@@ -996,7 +952,6 @@ static const mp_rom_map_elem_t framebuf_locals_dict_table[] = {
     { MP_ROM_QSTR(MP_QSTR_poly), MP_ROM_PTR(&framebuf_poly_obj) },
     #endif
     { MP_ROM_QSTR(MP_QSTR_blit), MP_ROM_PTR(&framebuf_blit_obj) },
-    { MP_ROM_QSTR(MP_QSTR_blit_mask), MP_ROM_PTR(&framebuf_blit_mask_obj) },
     { MP_ROM_QSTR(MP_QSTR_scroll), MP_ROM_PTR(&framebuf_scroll_obj) },
     { MP_ROM_QSTR(MP_QSTR_text), MP_ROM_PTR(&framebuf_text_obj) },
 };
