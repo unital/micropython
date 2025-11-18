@@ -803,8 +803,8 @@ static mp_obj_t framebuf_blit(size_t n_args, const mp_obj_t *args_in) {
     // Clip.
     int x0 = MAX(0, x);
     int y0 = MAX(0, y);
-    mp_int_t x1 = MAX(0, -x);
-    mp_int_t y1 = MAX(0, -y);
+    int x1 = MAX(0, -x);
+    int y1 = MAX(0, -y);
     int x0end = MIN(self->width, x + source.width);
     int y0end = MIN(self->height, y + source.height);
 
@@ -817,6 +817,10 @@ static mp_obj_t framebuf_blit(size_t n_args, const mp_obj_t *args_in) {
             alpha = mp_obj_get_int(args_in[6]);
         } else {
             get_readonly_framebuffer(args_in[6], &mask);
+            if (mask.width != source.width || mask.height != source.height) {
+                // mask and source must be the same shape
+                mp_raise_ValueError(MP_ERROR_TEXT("Mask and source different sizes."));
+            }
             switch (mask.format) {
                 case FRAMEBUF_MVLSB:
                 case FRAMEBUF_MHLSB:
@@ -840,15 +844,14 @@ static mp_obj_t framebuf_blit(size_t n_args, const mp_obj_t *args_in) {
     }
 
     for (; y0 < y0end; ++y0) {
-        mp_int_t cx1 = x1;
+        int cx1 = x1;
         for (int cx0 = x0; cx0 < x0end; ++cx0) {
             uint32_t col = getpixel(&source, cx1, y1);
             if (palette.buf) {
                 col = getpixel(&palette, col, 0);
             }
             if (alpha_mul) {
-                // if source bigger than mask, wrap around
-                alpha = getpixel(&mask, cx1 % mask.width, y1 % mask.height) * alpha_mul;
+                alpha = getpixel(&mask, cx1, y1) * alpha_mul;
             }
             if (col != (uint32_t)key) {
                 setpixel_alpha(self, cx0, y0, col, alpha);
