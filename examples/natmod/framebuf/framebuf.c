@@ -1,5 +1,6 @@
 #define MICROPY_PY_ARRAY (1)
 #define MICROPY_PY_FRAMEBUF (1)
+#define MICROPY_PY_FRAMEBUF_ALPHA (1)
 
 #include "py/dynruntime.h"
 

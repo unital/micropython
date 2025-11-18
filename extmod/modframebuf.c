@@ -296,7 +296,7 @@ static void setpixel_alpha(const mp_obj_framebuf_t *fb, mp_int_t x, mp_int_t y, 
     }
     formats[fb->format].setpixel(fb, x, y, col);
 }
-#endif
+#endif // MICROPY_PY_FRAMEBUF_ALPHA
 
 static void fill_rect(const mp_obj_framebuf_t *fb, int x, int y, int w, int h, uint32_t col) {
     if (h < 1 || w < 1 || x + w <= 0 || y + h <= 0 || y >= fb->height || x >= fb->width) {
@@ -779,6 +779,25 @@ static mp_obj_t framebuf_blit(size_t n_args, const mp_obj_t *args_in) {
     mp_int_t x = mp_obj_get_int(args_in[2]);
     mp_int_t y = mp_obj_get_int(args_in[3]);
 
+    if (
+        (x >= self->width) ||
+        (y >= self->height) ||
+        (-x >= source.width) ||
+        (-y >= source.height)
+        ) {
+        // Out of bounds, no-op, leave early.
+        return mp_const_none;
+    }
+
+    // Clip.
+    int x0 = MAX(0, x);
+    int y0 = MAX(0, y);
+    int x1 = MAX(0, -x);
+    int y1 = MAX(0, -y);
+    int x0end = MIN(self->width, x + source.width);
+    int y0end = MIN(self->height, y + source.height);
+
+    // Key and palette argument handling.
     mp_int_t key = -1;
     if (n_args > 4) {
         key = mp_obj_get_int(args_in[4]);
@@ -822,26 +841,7 @@ static mp_obj_t framebuf_blit(size_t n_args, const mp_obj_t *args_in) {
                     mp_raise_ValueError(MP_ERROR_TEXT("invalid mask format"));
             }
         }
-    #endif
     }
-
-    if (
-        (x >= self->width) ||
-        (y >= self->height) ||
-        (-x >= source.width) ||
-        (-y >= source.height)
-        ) {
-        // Out of bounds, no-op.
-        return mp_const_none;
-    }
-
-    // Clip.
-    int x0 = MAX(0, x);
-    int y0 = MAX(0, y);
-    int x1 = MAX(0, -x);
-    int y1 = MAX(0, -y);
-    int x0end = MIN(self->width, x + source.width);
-    int y0end = MIN(self->height, y + source.height);
 
     for (; y0 < y0end; ++y0) {
         int cx1 = x1;
@@ -850,23 +850,30 @@ static mp_obj_t framebuf_blit(size_t n_args, const mp_obj_t *args_in) {
             if (palette.buf) {
                 col = getpixel(&palette, col, 0);
             }
-
-            #if MICROPY_PY_FRAMEBUF_ALPHA
-            if (alpha_mul) {
-                alpha = getpixel(&mask, cx1, y1) * alpha_mul;
-            }
+            alpha = getpixel(&mask, cx1, y1) * alpha_mul;
             if (col != (uint32_t)key) {
                 setpixel_alpha(self, cx0, y0, col, alpha);
             }
-            #else
-            if (col != (uint32_t)key) {
-                setpixel(self, cx0, y0, col);
-            }
-            #endif
             ++cx1;
         }
         ++y1;
     }
+    #else
+    for (; y0 < y0end; ++y0) {
+        int cx1 = x1;
+        for (int cx0 = x0; cx0 < x0end; ++cx0) {
+            uint32_t col = getpixel(&source, cx1, y1);
+            if (palette.buf) {
+                col = getpixel(&palette, col, 0);
+            }
+            if (col != (uint32_t)key) {
+                setpixel(self, cx0, y0, col);
+            }
+            ++cx1;
+        }
+        ++y1;
+    }
+    #endif // MICROPY_PY_FRAMEBUF_ALPHA
     return mp_const_none;
 }
 static MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(framebuf_blit_obj, 4, 7, framebuf_blit);
