@@ -778,13 +778,23 @@ static mp_obj_t framebuf_blit(size_t n_args, const mp_obj_t *args_in) {
     mp_int_t y = mp_obj_get_int(args_in[3]);
 
     mp_int_t key = -1;
-    size_t alpha_mul = 0;
-    mp_obj_framebuf_t mask;
     if (n_args > 4) {
-        if (mp_obj_get_type(args_in[4]) == &mp_type_int) {
-            key = mp_obj_get_int(args_in[4]);
+        key = mp_obj_get_int(args_in[4]);
+    }
+    mp_obj_framebuf_t palette;
+    palette.buf = NULL;
+    if (n_args > 5 && args_in[5] != mp_const_none) {
+        get_readonly_framebuffer(args_in[5], &palette);
+    }
+
+    mp_int_t alpha = 0x100;
+    mp_int_t alpha_mul = 0;
+    mp_obj_framebuf_t mask;
+    if (n_args > 6 && args_in[6] != mp_const_none) {
+        if (mp_obj_get_type(args_in[6]) == &mp_type_int) {
+            alpha = mp_obj_get_int(args_in[6]);
         } else {
-            get_readonly_framebuffer(args_in[4], &mask);
+            get_readonly_framebuffer(args_in[6], &mask);
             if (mask.width != source.width || mask.height != source.height) {
                 // mask and source must be the same shape
                 mp_raise_ValueError(MP_ERROR_TEXT("Mask and source different sizes."));
@@ -809,11 +819,6 @@ static mp_obj_t framebuf_blit(size_t n_args, const mp_obj_t *args_in) {
                     mp_raise_ValueError(MP_ERROR_TEXT("invalid mask format"));
             }
         }
-    }
-    mp_obj_framebuf_t palette;
-    palette.buf = NULL;
-    if (n_args > 5 && args_in[5] != mp_const_none) {
-        get_readonly_framebuffer(args_in[5], &palette);
     }
 
     if (
@@ -842,10 +847,10 @@ static mp_obj_t framebuf_blit(size_t n_args, const mp_obj_t *args_in) {
                 col = getpixel(&palette, col, 0);
             }
             if (alpha_mul) {
-                uint32_t alpha = getpixel(&mask, cx1, y1) * alpha_mul;
+                alpha = getpixel(&mask, cx1, y1) * alpha_mul;
+            }
+            if (col != (uint32_t)key) {
                 setpixel_alpha(self, cx0, y0, col, alpha);
-            } else if (col != (uint32_t)key) {
-                setpixel(self, cx0, y0, col);
             }
             ++cx1;
         }
@@ -853,7 +858,7 @@ static mp_obj_t framebuf_blit(size_t n_args, const mp_obj_t *args_in) {
     }
     return mp_const_none;
 }
-static MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(framebuf_blit_obj, 4, 6, framebuf_blit);
+static MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(framebuf_blit_obj, 4, 7, framebuf_blit);
 
 static mp_obj_t framebuf_scroll(mp_obj_t self_in, mp_obj_t xstep_in, mp_obj_t ystep_in) {
     mp_obj_framebuf_t *self = MP_OBJ_TO_PTR(self_in);
