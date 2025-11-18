@@ -422,12 +422,16 @@ static mp_obj_t framebuf_pixel(size_t n_args, const mp_obj_t *args_in) {
             return MP_OBJ_NEW_SMALL_INT(getpixel(self, x, y));
         } else {
             // set
-            setpixel(self, x, y, mp_obj_get_int(args_in[3]));
+            mp_int_t alpha = 0x100;
+            if (n_args == 4) {
+                alpha = mp_obj_get_int(args_in[4]);
+            }
+            setpixel_alpha(self, x, y, mp_obj_get_int(args_in[3]), alpha);
         }
     }
     return mp_const_none;
 }
-static MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(framebuf_pixel_obj, 3, 4, framebuf_pixel);
+static MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(framebuf_pixel_obj, 3, 5, framebuf_pixel);
 
 static mp_obj_t framebuf_hline(size_t n_args, const mp_obj_t *args_in) {
     (void)n_args;
