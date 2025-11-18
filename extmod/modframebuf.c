@@ -789,14 +789,6 @@ static mp_obj_t framebuf_blit(size_t n_args, const mp_obj_t *args_in) {
         return mp_const_none;
     }
 
-    // Clip.
-    int x0 = MAX(0, x);
-    int y0 = MAX(0, y);
-    int x1 = MAX(0, -x);
-    int y1 = MAX(0, -y);
-    int x0end = MIN(self->width, x + source.width);
-    int y0end = MIN(self->height, y + source.height);
-
     // Key and palette argument handling.
     mp_int_t key = -1;
     if (n_args > 4) {
@@ -807,6 +799,14 @@ static mp_obj_t framebuf_blit(size_t n_args, const mp_obj_t *args_in) {
     if (n_args > 5 && args_in[5] != mp_const_none) {
         get_readonly_framebuffer(args_in[5], &palette);
     }
+
+    // Clip.
+    int x0 = MAX(0, x);
+    int y0 = MAX(0, y);
+    int x1 = MAX(0, -x);
+    int y1 = MAX(0, -y);
+    int x0end = MIN(self->width, x + source.width);
+    int y0end = MIN(self->height, y + source.height);
 
     #if MICROPY_PY_FRAMEBUF_ALPHA
     mp_int_t alpha = 0x100;
@@ -1013,6 +1013,7 @@ static const mp_rom_map_elem_t framebuf_module_globals_table[] = {
     { MP_ROM_QSTR(MP_QSTR_GS8), MP_ROM_INT(FRAMEBUF_GS8) },
     { MP_ROM_QSTR(MP_QSTR_MONO_HLSB), MP_ROM_INT(FRAMEBUF_MHLSB) },
     { MP_ROM_QSTR(MP_QSTR_MONO_HMSB), MP_ROM_INT(FRAMEBUF_MHMSB) },
+    { MP_ROM_QSTR(MP_QSTR_ALPHA), MP_ROM_INT(MICROPY_PY_FRAMEBUF_ALPHA) },
 };
 
 static MP_DEFINE_CONST_DICT(framebuf_module_globals, framebuf_module_globals_table);
