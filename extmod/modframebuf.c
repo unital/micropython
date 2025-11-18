@@ -255,6 +255,7 @@ static inline uint32_t getpixel(const mp_obj_framebuf_t *fb, unsigned int x, uns
     return formats[fb->format].getpixel(fb, x, y);
 }
 
+#if MICROPY_PY_FRAMEBUF_ALPHA
 typedef struct __attribute__((packed)) rgb565 {
     uint8_t b : 5;
     uint8_t g : 6;
@@ -295,6 +296,7 @@ static void setpixel_alpha(const mp_obj_framebuf_t *fb, mp_int_t x, mp_int_t y, 
     }
     formats[fb->format].setpixel(fb, x, y, col);
 }
+#endif
 
 static void fill_rect(const mp_obj_framebuf_t *fb, int x, int y, int w, int h, uint32_t col) {
     if (h < 1 || w < 1 || x + w <= 0 || y + h <= 0 || y >= fb->height || x >= fb->width) {
@@ -787,6 +789,7 @@ static mp_obj_t framebuf_blit(size_t n_args, const mp_obj_t *args_in) {
         get_readonly_framebuffer(args_in[5], &palette);
     }
 
+    #if MICROPY_PY_FRAMEBUF_ALPHA
     mp_int_t alpha = 0x100;
     mp_int_t alpha_mul = 0;
     mp_obj_framebuf_t mask;
@@ -819,6 +822,7 @@ static mp_obj_t framebuf_blit(size_t n_args, const mp_obj_t *args_in) {
                     mp_raise_ValueError(MP_ERROR_TEXT("invalid mask format"));
             }
         }
+    #endif
     }
 
     if (
@@ -846,12 +850,19 @@ static mp_obj_t framebuf_blit(size_t n_args, const mp_obj_t *args_in) {
             if (palette.buf) {
                 col = getpixel(&palette, col, 0);
             }
+
+            #if MICROPY_PY_FRAMEBUF_ALPHA
             if (alpha_mul) {
                 alpha = getpixel(&mask, cx1, y1) * alpha_mul;
             }
             if (col != (uint32_t)key) {
                 setpixel_alpha(self, cx0, y0, col, alpha);
             }
+            #else
+            if (col != (uint32_t)key) {
+                setpixel(self, cx0, y0, col);
+            }
+            #endif
             ++cx1;
         }
         ++y1;
