@@ -245,7 +245,7 @@ static mp_framebuf_p_t formats[] = {
 #if MICROPY_PY_FRAMEBUF_ALPHA
 #ifndef FRAMEBUF_GET_ALPHA_ARG
 #define FRAMEBUF_GET_ALPHA_ARG(idx) ((n_args > idx) ? mp_obj_get_int(args_in[idx]) : 0x100)
-#endif //GET_ALPHA_ARG
+#endif // GET_ALPHA_ARG
 
 typedef struct __attribute__((packed)) rgb565 {
     uint8_t b : 5;
@@ -311,7 +311,7 @@ static void fill_rect(const mp_obj_framebuf_t *fb, int x, int y, int w, int h, u
 #else
 #ifndef FRAMEBUF_GET_ALPHA_ARG
 #define FRAMEBUF_GET_ALPHA_ARG(idx) (0x100)
-#endif //GET_ALPHA_ARG
+#endif // GET_ALPHA_ARG
 
 static inline void setpixel(const mp_obj_framebuf_t *fb, unsigned int x, unsigned int y, uint32_t col, mp_int_t alpha) {
     formats[fb->format].setpixel(fb, x, y, col);
@@ -435,9 +435,9 @@ static MP_DEFINE_CONST_FUN_OBJ_2(framebuf_fill_obj, framebuf_fill);
 
 static mp_obj_t framebuf_fill_rect(size_t n_args, const mp_obj_t *args_in) {
     mp_obj_framebuf_t *self = MP_OBJ_TO_PTR(args_in[0]);
-    mp_int_t args[6] = {0, 0, 0, 0, 0, 0x100}; // x, y, w, h, col, alpha
-    framebuf_args(args_in, args, n_args - 1);
-    fill_rect(self, args[0], args[1], args[2], args[3], args[4], args[5]);
+    mp_int_t args[5]; // x, y, w, h, col
+    framebuf_args(args_in, args, 5);
+    fill_rect(self, args[0], args[1], args[2], args[3], args[4], FRAMEBUF_GET_ALPHA_ARG(6));
     return mp_const_none;
 }
 static MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(framebuf_fill_rect_obj, 6, 7, framebuf_fill_rect);
@@ -452,8 +452,7 @@ static mp_obj_t framebuf_pixel(size_t n_args, const mp_obj_t *args_in) {
             return MP_OBJ_NEW_SMALL_INT(getpixel(self, x, y));
         } else {
             // set
-            mp_int_t alpha = FRAMEBUF_GET_ALPHA_ARG(4);
-            setpixel(self, x, y, mp_obj_get_int(args_in[3]), alpha);
+            setpixel(self, x, y, mp_obj_get_int(args_in[3]), FRAMEBUF_GET_ALPHA_ARG(4));
         }
     }
     return mp_const_none;
@@ -464,10 +463,10 @@ static mp_obj_t framebuf_hline(size_t n_args, const mp_obj_t *args_in) {
     (void)n_args;
 
     mp_obj_framebuf_t *self = MP_OBJ_TO_PTR(args_in[0]);
-    mp_int_t args[5] = {0, 0, 0, 0, 0x100}; // x, y, w, col, alpha
-    framebuf_args(args_in, args, n_args - 1);
+    mp_int_t args[4]; // x, y, w, col
+    framebuf_args(args_in, args, 4);
 
-    fill_rect(self, args[0], args[1], args[2], 1, args[3], args[4]);
+    fill_rect(self, args[0], args[1], args[2], 1, args[3], FRAMEBUF_GET_ALPHA_ARG(5));
 
     return mp_const_none;
 }
@@ -477,10 +476,10 @@ static mp_obj_t framebuf_vline(size_t n_args, const mp_obj_t *args_in) {
     (void)n_args;
 
     mp_obj_framebuf_t *self = MP_OBJ_TO_PTR(args_in[0]);
-    mp_int_t args[5] = {0, 0, 0, 0, 0x100}; // x, y, h, col, alpha
-    framebuf_args(args_in, args, n_args - 1);
+    mp_int_t args[4]; // x, y, h, col
+    framebuf_args(args_in, args, 4);
 
-    fill_rect(self, args[0], args[1], 1, args[2], args[3], args[4]);
+    fill_rect(self, args[0], args[1], 1, args[2], args[3], FRAMEBUF_GET_ALPHA_ARG(5));
 
     return mp_const_none;
 }
