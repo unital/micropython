@@ -157,3 +157,19 @@ for bpp, format in [
     fbuf.fill(0b00000_111111_00000)
     fbuf.blit(fbuf2, 1, 1, -1, None, mask)
     printbuf(2)
+
+# Ellipse
+w = 30
+h = 30
+buf = bytearray(w * h)
+fbuf = framebuf.FrameBuffer(buf, w, h, framebuf.GS8)
+
+# Outline
+fbuf.fill(0)
+fbuf.ellipse(15, 15, 12, 6, 0x7F, False, 0b1111, 0x7F)
+printbuf()
+
+# Fill
+fbuf.fill(0)
+fbuf.ellipse(15, 15, 6, 12, 0xAA, True, 0b1111, 0x7F)
+printbuf()
