@@ -47,6 +47,24 @@ for x, y in ((-1, -1), (0, 0), (1, 1), (4, 3)):
     fbuf.fill_rect(x, y, 2, 2, 0x7F, 0x7F)
     printbuf()
 
+# hline at various locations with alpha.
+for x, y in ((-1, -1), (0, 0), (1, 1), (4, 3)):
+    fbuf.fill(0)
+    fbuf.hline(x, y, 2, 0x7F, 0x7F)
+    printbuf()
+
+# vline at various locations with alpha.
+for x, y in ((-1, -1), (0, 0), (1, 1), (4, 3)):
+    fbuf.fill(0)
+    fbuf.vline(x, y, 2, 0x7F, 0x7F)
+    printbuf()
+
+# unfilled rect at various locations with alpha.
+for x, y in ((-1, -1), (0, 0), (1, 1), (4, 3)):
+    fbuf.fill(0)
+    fbuf.rect(x, y, 3, 3, 0x7F, False, 0x7F)
+    printbuf()
+
 # Blit another FrameBuffer, at various locations with alpha.
 for x, y in ((-1, -1), (0, 0), (1, 1), (4, 3)):
     fbuf.fill(0)
