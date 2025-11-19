@@ -423,11 +423,11 @@ static mp_obj_t framebuf_pixel(size_t n_args, const mp_obj_t *args_in) {
         } else {
             // set
             #if MICROPY_PY_FRAMEBUF_ALPHA
-            if (n_args == 4) {
+            if (n_args >= 5) {
                 setpixel_alpha(self, x, y, mp_obj_get_int(args_in[3]), mp_obj_get_int(args_in[4]));
                 return mp_const_none;
             }
-            #endif //MICROPY_PY_FRAMEBUF_ALPHA
+            #endif // MICROPY_PY_FRAMEBUF_ALPHA
             setpixel(self, x, y, mp_obj_get_int(args_in[3]));
         }
     }
