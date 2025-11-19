@@ -35,6 +35,18 @@ fbuf = framebuf.FrameBuffer(buf, w, h, framebuf.GS8)
 fbuf2 = framebuf.FrameBuffer(bytearray(4), 2, 2, framebuf.GS8)
 fbuf2.fill(0x7F)
 
+# set pixel at various locations with alpha.
+for x, y in ((-1, -1), (0, 0), (1, 1), (4, 3)):
+    fbuf.fill(0)
+    fbuf.pixel(x, y, 0x7F, 0x7F)
+    printbuf()
+
+# rect at various locations with alpha.
+for x, y in ((-1, -1), (0, 0), (1, 1), (4, 3)):
+    fbuf.fill(0)
+    fbuf.fill_rect(x, y, 2, 2, 0x7F, 0x7F)
+    printbuf()
+
 # Blit another FrameBuffer, at various locations with alpha.
 for x, y in ((-1, -1), (0, 0), (1, 1), (4, 3)):
     fbuf.fill(0)

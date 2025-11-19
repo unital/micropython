@@ -241,19 +241,6 @@ static mp_framebuf_p_t formats[] = {
     [FRAMEBUF_MHMSB] = {mono_horiz_setpixel, mono_horiz_getpixel, mono_horiz_fill_rect},
 };
 
-static inline void setpixel(const mp_obj_framebuf_t *fb, unsigned int x, unsigned int y, uint32_t col) {
-    formats[fb->format].setpixel(fb, x, y, col);
-}
-
-static void setpixel_checked(const mp_obj_framebuf_t *fb, mp_int_t x, mp_int_t y, mp_int_t col, mp_int_t mask) {
-    if (mask && 0 <= x && x < fb->width && 0 <= y && y < fb->height) {
-        setpixel(fb, x, y, col);
-    }
-}
-
-static inline uint32_t getpixel(const mp_obj_framebuf_t *fb, unsigned int x, unsigned int y) {
-    return formats[fb->format].getpixel(fb, x, y);
-}
 
 #if MICROPY_PY_FRAMEBUF_ALPHA
 typedef struct __attribute__((packed)) rgb565 {
@@ -271,34 +258,58 @@ static uint32_t alpha_blend(uint32_t c1, uint32_t c2, uint32_t alpha) {
     return ((c1 * (0x100 - alpha)) + (alpha + 1) * c2) >> 8;
 }
 
-static void setpixel_alpha(const mp_obj_framebuf_t *fb, mp_int_t x, mp_int_t y, mp_int_t col, mp_int_t alpha) {
+static void setpixel(const mp_obj_framebuf_t *fb, mp_int_t x, mp_int_t y, uint32_t col, mp_int_t alpha) {
     if (alpha <= 0) {
         // nothing to do
         return;
-    } else if (alpha >= 0xff) {
-        // no blending needed
-        setpixel(fb, x, y, col);
-    }
-    uint16_t pix_col = formats[fb->format].getpixel(fb, x, y);
-    if (fb->format == FRAMEBUF_RGB565) {
-        uint16_t col16 = col;
-        urgb565 pix_col_struct = *(urgb565 *)&pix_col;
-        urgb565 col_struct = *(urgb565 *)&col16;
-        col_struct.rgb.r = alpha_blend(pix_col_struct.rgb.r, col_struct.rgb.r, alpha);
-        col_struct.rgb.g = alpha_blend(pix_col_struct.rgb.g, col_struct.rgb.g, alpha);
-        col_struct.rgb.b = alpha_blend(pix_col_struct.rgb.b, col_struct.rgb.b, alpha);
-        col_struct.rgb.r = MIN(col_struct.rgb.r, 0b11111);
-        col_struct.rgb.g = MIN(col_struct.rgb.g, 0b111111);
-        col_struct.rgb.b = MIN(col_struct.rgb.b, 0b11111);
-        col = *(uint16_t *)&col_struct;
-    } else {
-        col = alpha_blend(pix_col, col, alpha);
+    } else if (alpha < 0xff) {
+        uint16_t pix_col = formats[fb->format].getpixel(fb, x, y);
+        if (fb->format == FRAMEBUF_RGB565) {
+            uint16_t col16 = col;
+            urgb565 pix_col_struct = *(urgb565 *)&pix_col;
+            urgb565 col_struct = *(urgb565 *)&col16;
+            col_struct.rgb.r = alpha_blend(pix_col_struct.rgb.r, col_struct.rgb.r, alpha);
+            col_struct.rgb.g = alpha_blend(pix_col_struct.rgb.g, col_struct.rgb.g, alpha);
+            col_struct.rgb.b = alpha_blend(pix_col_struct.rgb.b, col_struct.rgb.b, alpha);
+            col_struct.rgb.r = MIN(col_struct.rgb.r, 0b11111);
+            col_struct.rgb.g = MIN(col_struct.rgb.g, 0b111111);
+            col_struct.rgb.b = MIN(col_struct.rgb.b, 0b11111);
+            col = *(uint16_t *)&col_struct;
+        } else {
+            col = alpha_blend(pix_col, col, alpha);
+        }
     }
     formats[fb->format].setpixel(fb, x, y, col);
 }
-#endif // MICROPY_PY_FRAMEBUF_ALPHA
 
-static void fill_rect(const mp_obj_framebuf_t *fb, int x, int y, int w, int h, uint32_t col) {
+static void fill_rect(const mp_obj_framebuf_t *fb, int x, int y, int w, int h, uint32_t col, mp_int_t alpha) {
+    if (alpha == 0 || h < 1 || w < 1 || x + w <= 0 || y + h <= 0 || y >= fb->height || x >= fb->width) {
+        // No operation needed.
+        return;
+    }
+
+    // clip to the framebuffer
+    int xend = MIN(fb->width, x + w);
+    int yend = MIN(fb->height, y + h);
+    x = MAX(x, 0);
+    y = MAX(y, 0);
+
+    if (alpha >= 0xff) {
+        formats[fb->format].fill_rect(fb, x, y, xend - x, yend - y, col);
+    } else {
+        for (; y < yend; ++y) {
+            for (int x0 = x; x0 < xend; ++x0) {
+                setpixel(fb, x0, y, col, alpha);
+            }
+        }
+    }
+}
+#else
+static inline void setpixel(const mp_obj_framebuf_t *fb, unsigned int x, unsigned int y, uint32_t col, mp_int_t alpha) {
+    formats[fb->format].setpixel(fb, x, y, col);
+}
+
+static void fill_rect(const mp_obj_framebuf_t *fb, int x, int y, int w, int h, uint32_t col, mp_int_t alpha) {
     if (h < 1 || w < 1 || x + w <= 0 || y + h <= 0 || y >= fb->height || x >= fb->width) {
         // No operation needed.
         return;
@@ -311,6 +322,17 @@ static void fill_rect(const mp_obj_framebuf_t *fb, int x, int y, int w, int h, u
     y = MAX(y, 0);
 
     formats[fb->format].fill_rect(fb, x, y, xend - x, yend - y, col);
+}
+#endif // MICROPY_PY_FRAMEBUF_ALPHA
+
+static void setpixel_checked(const mp_obj_framebuf_t *fb, mp_int_t x, mp_int_t y, mp_int_t col, mp_int_t mask, mp_int_t alpha) {
+    if (mask && alpha > 0 && 0 <= x && x < fb->width && 0 <= y && y < fb->height) {
+        setpixel(fb, x, y, col, alpha);
+    }
+}
+
+static inline uint32_t getpixel(const mp_obj_framebuf_t *fb, unsigned int x, unsigned int y) {
+    return formats[fb->format].getpixel(fb, x, y);
 }
 
 static mp_obj_t framebuf_make_new_helper(size_t n_args, const mp_obj_t *args_in, unsigned int buf_flags, mp_obj_framebuf_t *o) {
@@ -405,12 +427,13 @@ static MP_DEFINE_CONST_FUN_OBJ_2(framebuf_fill_obj, framebuf_fill);
 
 static mp_obj_t framebuf_fill_rect(size_t n_args, const mp_obj_t *args_in) {
     mp_obj_framebuf_t *self = MP_OBJ_TO_PTR(args_in[0]);
-    mp_int_t args[5]; // x, y, w, h, col
-    framebuf_args(args_in, args, 5);
-    fill_rect(self, args[0], args[1], args[2], args[3], args[4]);
+    mp_int_t args[6]; // x, y, w, h, col, alpha
+    args[5] = 0x100;
+    framebuf_args(args_in, args, n_args - 1);
+    fill_rect(self, args[0], args[1], args[2], args[3], args[4], args[5]);
     return mp_const_none;
 }
-static MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(framebuf_fill_rect_obj, 6, 6, framebuf_fill_rect);
+static MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(framebuf_fill_rect_obj, 6, 7, framebuf_fill_rect);
 
 static mp_obj_t framebuf_pixel(size_t n_args, const mp_obj_t *args_in) {
     mp_obj_framebuf_t *self = MP_OBJ_TO_PTR(args_in[0]);
@@ -422,13 +445,8 @@ static mp_obj_t framebuf_pixel(size_t n_args, const mp_obj_t *args_in) {
             return MP_OBJ_NEW_SMALL_INT(getpixel(self, x, y));
         } else {
             // set
-            #if MICROPY_PY_FRAMEBUF_ALPHA
-            if (n_args >= 5) {
-                setpixel_alpha(self, x, y, mp_obj_get_int(args_in[3]), mp_obj_get_int(args_in[4]));
-                return mp_const_none;
-            }
-            #endif // MICROPY_PY_FRAMEBUF_ALPHA
-            setpixel(self, x, y, mp_obj_get_int(args_in[3]));
+            mp_int_t alpha = (n_args >= 5) ? mp_obj_get_int(args_in[4]) : 0x100;
+            setpixel(self, x, y, mp_obj_get_int(args_in[3]), alpha);
         }
     }
     return mp_const_none;
@@ -442,7 +460,7 @@ static mp_obj_t framebuf_hline(size_t n_args, const mp_obj_t *args_in) {
     mp_int_t args[4]; // x, y, w, col
     framebuf_args(args_in, args, 4);
 
-    fill_rect(self, args[0], args[1], args[2], 1, args[3]);
+    fill_rect(self, args[0], args[1], args[2], 1, args[3], 0x100);
 
     return mp_const_none;
 }
@@ -455,7 +473,7 @@ static mp_obj_t framebuf_vline(size_t n_args, const mp_obj_t *args_in) {
     mp_int_t args[4]; // x, y, h, col
     framebuf_args(args_in, args, 4);
 
-    fill_rect(self, args[0], args[1], 1, args[2], args[3]);
+    fill_rect(self, args[0], args[1], 1, args[2], args[3], 0x100);
 
     return mp_const_none;
 }
@@ -466,12 +484,12 @@ static mp_obj_t framebuf_rect(size_t n_args, const mp_obj_t *args_in) {
     mp_int_t args[5]; // x, y, w, h, col
     framebuf_args(args_in, args, 5);
     if (n_args > 6 && mp_obj_is_true(args_in[6])) {
-        fill_rect(self, args[0], args[1], args[2], args[3], args[4]);
+        fill_rect(self, args[0], args[1], args[2], args[3], args[4], 0x100);
     } else {
-        fill_rect(self, args[0], args[1], args[2], 1, args[4]);
-        fill_rect(self, args[0], args[1] + args[3] - 1, args[2], 1, args[4]);
-        fill_rect(self, args[0], args[1], 1, args[3], args[4]);
-        fill_rect(self, args[0] + args[2] - 1, args[1], 1, args[3], args[4]);
+        fill_rect(self, args[0], args[1], args[2], 1, args[4], 0x100);
+        fill_rect(self, args[0], args[1] + args[3] - 1, args[2], 1, args[4], 0x100);
+        fill_rect(self, args[0], args[1], 1, args[3], args[4], 0x100);
+        fill_rect(self, args[0] + args[2] - 1, args[1], 1, args[3], args[4], 0x100);
     }
     return mp_const_none;
 }
@@ -517,11 +535,11 @@ static void line(const mp_obj_framebuf_t *fb, mp_int_t x1, mp_int_t y1, mp_int_t
     for (mp_int_t i = 0; i < dx; ++i) {
         if (steep) {
             if (0 <= y1 && y1 < fb->width && 0 <= x1 && x1 < fb->height) {
-                setpixel(fb, y1, x1, col);
+                setpixel(fb, y1, x1, col, 0x100);
             }
         } else {
             if (0 <= x1 && x1 < fb->width && 0 <= y1 && y1 < fb->height) {
-                setpixel(fb, x1, y1, col);
+                setpixel(fb, x1, y1, col, 0x100);
             }
         }
         while (e >= 0) {
@@ -532,7 +550,7 @@ static void line(const mp_obj_framebuf_t *fb, mp_int_t x1, mp_int_t y1, mp_int_t
         e += 2 * dy;
     }
 
-    setpixel_checked(fb, x2, y2, col, 1);
+    setpixel_checked(fb, x2, y2, col, 1, 0x100);
 }
 
 static mp_obj_t framebuf_line(size_t n_args, const mp_obj_t *args_in) {
@@ -560,22 +578,22 @@ static MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(framebuf_line_obj, 6, 6, framebuf_lin
 static void draw_ellipse_points(const mp_obj_framebuf_t *fb, mp_int_t cx, mp_int_t cy, mp_int_t x, mp_int_t y, mp_int_t col, mp_int_t mask) {
     if (mask & ELLIPSE_MASK_FILL) {
         if (mask & ELLIPSE_MASK_Q1) {
-            fill_rect(fb, cx, cy - y, x + 1, 1, col);
+            fill_rect(fb, cx, cy - y, x + 1, 1, col, 0x100);
         }
         if (mask & ELLIPSE_MASK_Q2) {
-            fill_rect(fb, cx - x, cy - y, x + 1, 1, col);
+            fill_rect(fb, cx - x, cy - y, x + 1, 1, col, 0x100);
         }
         if (mask & ELLIPSE_MASK_Q3) {
-            fill_rect(fb, cx - x, cy + y, x + 1, 1, col);
+            fill_rect(fb, cx - x, cy + y, x + 1, 1, col, 0x100);
         }
         if (mask & ELLIPSE_MASK_Q4) {
-            fill_rect(fb, cx, cy + y, x + 1, 1, col);
+            fill_rect(fb, cx, cy + y, x + 1, 1, col, 0x100);
         }
     } else {
-        setpixel_checked(fb, cx + x, cy - y, col, mask & ELLIPSE_MASK_Q1);
-        setpixel_checked(fb, cx - x, cy - y, col, mask & ELLIPSE_MASK_Q2);
-        setpixel_checked(fb, cx - x, cy + y, col, mask & ELLIPSE_MASK_Q3);
-        setpixel_checked(fb, cx + x, cy + y, col, mask & ELLIPSE_MASK_Q4);
+        setpixel_checked(fb, cx + x, cy - y, col, mask & ELLIPSE_MASK_Q1, 0x100);
+        setpixel_checked(fb, cx - x, cy - y, col, mask & ELLIPSE_MASK_Q2, 0x100);
+        setpixel_checked(fb, cx - x, cy + y, col, mask & ELLIPSE_MASK_Q3, 0x100);
+        setpixel_checked(fb, cx + x, cy + y, col, mask & ELLIPSE_MASK_Q4, 0x100);
     }
 }
 
@@ -590,7 +608,7 @@ static mp_obj_t framebuf_ellipse(size_t n_args, const mp_obj_t *args_in) {
         mask |= ELLIPSE_MASK_ALL;
     }
     if (args[2] == 0 && args[3] == 0) {
-        setpixel_checked(self, args[0], args[1], args[4], mask & ELLIPSE_MASK_ALL);
+        setpixel_checked(self, args[0], args[1], args[4], mask & ELLIPSE_MASK_ALL, 0x100);
         return mp_const_none;
     }
     mp_int_t two_asquare = 2 * args[2] * args[2];
@@ -701,9 +719,9 @@ static mp_obj_t framebuf_poly(size_t n_args, const mp_obj_t *args_in) {
                 } else if (row == MAX(py1, py2)) {
                     // At local-minima, try and manually fill in the pixels that get missed above.
                     if (py1 < py2) {
-                        setpixel_checked(self, x + px2, y + py2, col, 1);
+                        setpixel_checked(self, x + px2, y + py2, col, 1, 0x100);
                     } else if (py2 < py1) {
-                        setpixel_checked(self, x + px1, y + py1, col, 1);
+                        setpixel_checked(self, x + px1, y + py1, col, 1, 0x100);
                     } else {
                         // Even though this is a hline and would be faster to
                         // use fill_rect, use line() because it handles x2 <
@@ -737,7 +755,7 @@ static mp_obj_t framebuf_poly(size_t n_args, const mp_obj_t *args_in) {
 
             // Fill between each pair of nodes.
             for (i = 0; i < n_nodes; i += 2) {
-                fill_rect(self, x + nodes[i], y + row, (nodes[i + 1] - nodes[i]) + 1, 1, col);
+                fill_rect(self, x + nodes[i], y + row, (nodes[i + 1] - nodes[i]) + 1, 1, col, 0x100);
             }
         }
     } else {
@@ -814,8 +832,8 @@ static mp_obj_t framebuf_blit(size_t n_args, const mp_obj_t *args_in) {
     int x0end = MIN(self->width, x + source.width);
     int y0end = MIN(self->height, y + source.height);
 
-    #if MICROPY_PY_FRAMEBUF_ALPHA
     mp_int_t alpha = 0x100;
+    #if MICROPY_PY_FRAMEBUF_ALPHA
     mp_int_t alpha_mul = 0;
     mp_obj_framebuf_t mask;
     if (n_args > 6 && args_in[6] != mp_const_none) {
@@ -848,6 +866,7 @@ static mp_obj_t framebuf_blit(size_t n_args, const mp_obj_t *args_in) {
             }
         }
     }
+    #endif // MICROPY_PY_FRAMEBUF_ALPHA
 
     for (; y0 < y0end; ++y0) {
         int cx1 = x1;
@@ -856,32 +875,18 @@ static mp_obj_t framebuf_blit(size_t n_args, const mp_obj_t *args_in) {
             if (palette.buf) {
                 col = getpixel(&palette, col, 0);
             }
+            #if MICROPY_PY_FRAMEBUF_ALPHA
             if (alpha_mul) {
                 alpha = getpixel(&mask, cx1, y1) * alpha_mul;
             }
+            #endif // MICROPY_PY_FRAMEBUF_ALPHA
             if (col != (uint32_t)key) {
-                setpixel_alpha(self, cx0, y0, col, alpha);
+                setpixel(self, cx0, y0, col, alpha);
             }
             ++cx1;
         }
         ++y1;
     }
-    #else
-    for (; y0 < y0end; ++y0) {
-        int cx1 = x1;
-        for (int cx0 = x0; cx0 < x0end; ++cx0) {
-            uint32_t col = getpixel(&source, cx1, y1);
-            if (palette.buf) {
-                col = getpixel(&palette, col, 0);
-            }
-            if (col != (uint32_t)key) {
-                setpixel(self, cx0, y0, col);
-            }
-            ++cx1;
-        }
-        ++y1;
-    }
-    #endif // MICROPY_PY_FRAMEBUF_ALPHA
     return mp_const_none;
 }
 static MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(framebuf_blit_obj, 4, 7, framebuf_blit);
@@ -924,7 +929,7 @@ static mp_obj_t framebuf_scroll(mp_obj_t self_in, mp_obj_t xstep_in, mp_obj_t ys
     }
     for (; y != yend; y += dy) {
         for (unsigned x = sx; x != xend; x += dx) {
-            setpixel(self, x, y, getpixel(self, x - xstep, y - ystep));
+            setpixel(self, x, y, getpixel(self, x - xstep, y - ystep), 0x100);
         }
     }
     return mp_const_none;
@@ -958,7 +963,7 @@ static mp_obj_t framebuf_text(size_t n_args, const mp_obj_t *args_in) {
                 for (int y = y0; vline_data; vline_data >>= 1, y++) { // scan over vertical column
                     if (vline_data & 1) { // only draw if pixel set
                         if (0 <= y && y < self->height) { // clip y
-                            setpixel(self, x0, y, col);
+                            setpixel(self, x0, y, col, 0x100);
                         }
                     }
                 }
