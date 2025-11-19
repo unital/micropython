@@ -243,6 +243,10 @@ static mp_framebuf_p_t formats[] = {
 
 
 #if MICROPY_PY_FRAMEBUF_ALPHA
+#ifndef FRAMEBUF_GET_ALPHA_ARG
+#define FRAMEBUF_GET_ALPHA_ARG(idx) ((n_args > idx) ? mp_obj_get_int(args_in[idx]) : 0x100)
+#endif //GET_ALPHA_ARG
+
 typedef struct __attribute__((packed)) rgb565 {
     uint8_t b : 5;
     uint8_t g : 6;
@@ -305,6 +309,10 @@ static void fill_rect(const mp_obj_framebuf_t *fb, int x, int y, int w, int h, u
     }
 }
 #else
+#ifndef FRAMEBUF_GET_ALPHA_ARG
+#define FRAMEBUF_GET_ALPHA_ARG(idx) (0x100)
+#endif //GET_ALPHA_ARG
+
 static inline void setpixel(const mp_obj_framebuf_t *fb, unsigned int x, unsigned int y, uint32_t col, mp_int_t alpha) {
     formats[fb->format].setpixel(fb, x, y, col);
 }
@@ -444,7 +452,7 @@ static mp_obj_t framebuf_pixel(size_t n_args, const mp_obj_t *args_in) {
             return MP_OBJ_NEW_SMALL_INT(getpixel(self, x, y));
         } else {
             // set
-            mp_int_t alpha = (n_args >= 5) ? mp_obj_get_int(args_in[4]) : 0x100;
+            mp_int_t alpha = FRAMEBUF_GET_ALPHA_ARG(4);
             setpixel(self, x, y, mp_obj_get_int(args_in[3]), alpha);
         }
     }
@@ -482,7 +490,7 @@ static mp_obj_t framebuf_rect(size_t n_args, const mp_obj_t *args_in) {
     mp_obj_framebuf_t *self = MP_OBJ_TO_PTR(args_in[0]);
     mp_int_t args[5]; // x, y, w, h, col
     framebuf_args(args_in, args, 5);
-    mp_int_t alpha = (n_args > 7) ? mp_obj_get_int(args_in[7]) : 0x100;
+    mp_int_t alpha = FRAMEBUF_GET_ALPHA_ARG(7);
     if (n_args > 6 && mp_obj_is_true(args_in[6])) {
         fill_rect(self, args[0], args[1], args[2], args[3], args[4], alpha);
     } else {
@@ -946,7 +954,7 @@ static mp_obj_t framebuf_text(size_t n_args, const mp_obj_t *args_in) {
     if (n_args >= 5) {
         col = mp_obj_get_int(args_in[4]);
     }
-    mp_int_t alpha = (n_args >= 6) ? mp_obj_get_int(args_in[5]) : 0x100;
+    mp_int_t alpha = FRAMEBUF_GET_ALPHA_ARG(5);
 
     // loop over chars
     for (; *str; ++str) {
