@@ -105,6 +105,12 @@ for bpp, format in [
     fbuf.blit(fbuf2, 1, 1, -1, None, mask)
     printbuf()
 
+# text at various locations with alpha.
+for x, y in ((-1, -1), (0, 0), (1, 1), (4, 3)):
+    fbuf.fill(0)
+    fbuf.text("x", x, y, 0x7F, 0x7F)
+    printbuf()
+
 # Now in color
 buf = bytearray(2 * w * h)
 fbuf = framebuf.FrameBuffer(buf, w, h, framebuf.RGB565)

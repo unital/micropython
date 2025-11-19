@@ -946,6 +946,7 @@ static mp_obj_t framebuf_text(size_t n_args, const mp_obj_t *args_in) {
     if (n_args >= 5) {
         col = mp_obj_get_int(args_in[4]);
     }
+    mp_int_t alpha = (n_args >= 6) ? mp_obj_get_int(args_in[5]) : 0x100;
 
     // loop over chars
     for (; *str; ++str) {
@@ -963,7 +964,7 @@ static mp_obj_t framebuf_text(size_t n_args, const mp_obj_t *args_in) {
                 for (int y = y0; vline_data; vline_data >>= 1, y++) { // scan over vertical column
                     if (vline_data & 1) { // only draw if pixel set
                         if (0 <= y && y < self->height) { // clip y
-                            setpixel(self, x0, y, col, 0x100);
+                            setpixel(self, x0, y, col, alpha);
                         }
                     }
                 }
@@ -972,7 +973,7 @@ static mp_obj_t framebuf_text(size_t n_args, const mp_obj_t *args_in) {
     }
     return mp_const_none;
 }
-static MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(framebuf_text_obj, 4, 5, framebuf_text);
+static MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(framebuf_text_obj, 4, 6, framebuf_text);
 
 #if !MICROPY_ENABLE_DYNRUNTIME
 static const mp_rom_map_elem_t framebuf_locals_dict_table[] = {
