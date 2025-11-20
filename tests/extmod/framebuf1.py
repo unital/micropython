@@ -4,11 +4,6 @@ except ImportError:
     print("SKIP")
     raise SystemExit
 
-if framebuf.ALPHA:
-    # not handling aa lines yet
-    print("SKIP")
-    raise SystemExit
-
 
 w = 5
 h = 16
@@ -76,7 +71,7 @@ for mapping in maps.keys():
 
     # line steep negative gradient
     fbuf.fill(0)
-    fbuf.line(3, 3, 2, 1, 1)
+    fbuf.line(3, 3, 2, 0, 1)
     print("line", buf)
 
     # scroll

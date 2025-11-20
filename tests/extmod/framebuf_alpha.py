@@ -41,6 +41,11 @@ for x, y in ((-1, -1), (0, 0), (1, 1), (4, 3)):
     fbuf.pixel(x, y, 0x7F, 0x7F)
     printbuf()
 
+# check that alpha 0x01 gives *something* for color 0x80 or more
+fbuf.fill(0)
+fbuf.pixel(0, 0, 0x80, 0x01)
+printbuf()
+
 # rect at various locations with alpha.
 for x, y in ((-1, -1), (0, 0), (1, 1), (4, 3)):
     fbuf.fill(0)
@@ -64,6 +69,26 @@ for x, y in ((-1, -1), (0, 0), (1, 1), (4, 3)):
     fbuf.fill(0)
     fbuf.rect(x, y, 3, 3, 0x7F, False, 0x7F)
     printbuf()
+
+# steep antialiased line.
+fbuf.fill(0)
+fbuf.line(1, 1, 2, 3, 0xFF)
+printbuf()
+
+# shallow antialiased line.
+fbuf.fill(0)
+fbuf.line(1, 1, 3, 2, 0xFF)
+printbuf()
+
+# steep antialiased line with alpha.
+fbuf.fill(0)
+fbuf.line(1, 1, 2, 3, 0xFF, 0x7F)
+printbuf()
+
+# shallow antialiased line with alpha.
+fbuf.fill(0)
+fbuf.line(1, 1, 3, 2, 0xFF, 0x7F)
+printbuf()
 
 # Blit another FrameBuffer, at various locations with alpha.
 for x, y in ((-1, -1), (0, 0), (1, 1), (4, 3)):

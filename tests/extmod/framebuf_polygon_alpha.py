@@ -11,8 +11,8 @@ if not hasattr(framebuf.FrameBuffer, "poly"):
     print("SKIP")
     raise SystemExit
 
-if framebuf.ALPHA:
-    # Test non-antialiased version
+if not framebuf.ALPHA:
+    # Testing for anti-aliased lines
     print("SKIP")
     raise SystemExit
 
@@ -223,3 +223,42 @@ fbuf.fill(0)
 fbuf.poly(0, 0, t1, 0xFF, True)
 fbuf.poly(0, 0, t2, 0xFF, True)
 print_buffer(buf, w, h)
+
+# Now with alpha
+w = 30
+h = 25
+fbuf = framebuf.FrameBuffer(buf, w, h, framebuf.GS8)
+col = 0xFF
+col_fill = 0x99
+
+# Draw the line polygon (at the origin) and the reversed-order polygon (offset).
+fbuf.fill(0)
+fbuf.poly(0, 0, poly, col, False, 0x7f)
+fbuf.poly(15, -2, poly_reversed, col, False, 0x7f)
+print_buffer(buf, w, h)
+print()
+
+# Same but filled.
+fbuf.fill(0)
+fbuf.poly(0, 0, poly, col_fill, True, 0x7f)
+fbuf.poly(15, -2, poly_reversed, col_fill, True, 0x7f)
+print_buffer(buf, w, h)
+print()
+
+# Draw the fill then the outline to ensure that no fill goes outside the outline.
+fbuf.fill(0)
+fbuf.poly(0, 0, poly, col_fill, True, 0x7f)
+fbuf.poly(0, 0, poly, col, False, 0x7f)
+fbuf.poly(15, -2, poly, col_fill, True, 0x7f)
+fbuf.poly(15, -2, poly, col, False, 0x7f)
+print_buffer(buf, w, h)
+print()
+
+# Draw the outline then the fill to ensure the fill completely covers the outline.
+fbuf.fill(0)
+fbuf.poly(0, 0, poly, col, False, 0x7f)
+fbuf.poly(0, 0, poly, col_fill, True, 0x7f)
+fbuf.poly(15, -2, poly, col, False, 0x7f)
+fbuf.poly(15, -2, poly, col_fill, True, 0x7f)
+print_buffer(buf, w, h)
+print()
