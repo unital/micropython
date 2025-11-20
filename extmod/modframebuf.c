@@ -308,6 +308,8 @@ static void fill_rect(const mp_obj_framebuf_t *fb, int x, int y, int w, int h, u
         }
     }
 }
+
+
 #else
 #ifndef FRAMEBUF_GET_ALPHA_ARG
 #define FRAMEBUF_GET_ALPHA_ARG(idx) (0x100)
@@ -331,6 +333,7 @@ static void fill_rect(const mp_obj_framebuf_t *fb, int x, int y, int w, int h, u
 
     formats[fb->format].fill_rect(fb, x, y, xend - x, yend - y, col);
 }
+
 #endif // MICROPY_PY_FRAMEBUF_ALPHA
 
 static void setpixel_checked(const mp_obj_framebuf_t *fb, mp_int_t x, mp_int_t y, mp_int_t col, mp_int_t mask, mp_int_t alpha) {
@@ -342,6 +345,132 @@ static void setpixel_checked(const mp_obj_framebuf_t *fb, mp_int_t x, mp_int_t y
 static inline uint32_t getpixel(const mp_obj_framebuf_t *fb, unsigned int x, unsigned int y) {
     return formats[fb->format].getpixel(fb, x, y);
 }
+
+#if MICROPY_PY_FRAMEBUF_ALPHA
+static void line(const mp_obj_framebuf_t *fb, mp_int_t x1, mp_int_t y1, mp_int_t x2, mp_int_t y2, mp_int_t col, mp_int_t alpha, bool draw_last) {
+    setpixel_checked(fb, x1, y1, col, 1, alpha);
+    if (x1 == x2 && y1 == y2) {
+        // nothing more to do
+        return;
+    }
+    if (draw_last) {
+        setpixel_checked(fb, x2, y2, col, 1, alpha);
+    }
+
+    mp_int_t dx = x2 - x1;
+    mp_int_t dy = y2 - y1;
+    if (dx + dy < 0) {
+        // swap ends
+        mp_int_t temp;
+        dx = -dx;
+        dy = -dy;
+        temp = x1;
+        x1 = x2;
+        x2 = temp;
+        temp = y1;
+        y1 = y2;
+        y2 = temp;
+    }
+
+    bool steep;
+    if (dy > dx || dy < -dx) {
+        // swap x and y
+        mp_int_t temp;
+        temp = x1;
+        x1 = y1;
+        y1 = temp;
+        temp = dx;
+        dx = dy;
+        dy = temp;
+        steep = true;
+    } else {
+        steep = false;
+    }
+
+    // Fixed point with 8 bits of fractional part.
+    // dx != 0 is guaranteed
+    mp_int_t gradient = ((dy << 8) / dx);
+
+    mp_int_t y_intercept = (y1 << 8) + gradient;
+    if (steep) {
+        for (mp_int_t x = x1 + 1; x < x1 + dx; ++x) {
+            setpixel_checked(fb, y_intercept >> 8, x, col, 1, (alpha * (0x100 - (y_intercept & 0xff))) >> 8);
+            setpixel_checked(fb, (y_intercept >> 8) + 1, x, col, 1, (alpha * (y_intercept & 0xff)) >> 8);
+            y_intercept += gradient;
+        }
+    } else {
+        for (mp_int_t x = x1 + 1; x < x1 + dx; ++x) {
+            setpixel_checked(fb, x, y_intercept >> 8, col, 1, (alpha * (0x100 - (y_intercept & 0xff))) >> 8);
+            setpixel_checked(fb, x, (y_intercept >> 8) + 1, col, 1, (alpha * (y_intercept & 0xff)) >> 8);
+            y_intercept += gradient;
+        }
+    }
+}
+#else
+static void line(const mp_obj_framebuf_t *fb, mp_int_t x1, mp_int_t y1, mp_int_t x2, mp_int_t y2, mp_int_t col, mp_int_t alpha, bool draw_last) {
+    if (alpha <= 0) {
+        // nothing to do
+        return;
+    }
+    mp_int_t dx = x2 - x1;
+    mp_int_t sx;
+    if (dx > 0) {
+        sx = 1;
+    } else {
+        dx = -dx;
+        sx = -1;
+    }
+
+    mp_int_t dy = y2 - y1;
+    mp_int_t sy;
+    if (dy > 0) {
+        sy = 1;
+    } else {
+        dy = -dy;
+        sy = -1;
+    }
+
+    bool steep;
+    if (dy > dx) {
+        mp_int_t temp;
+        temp = x1;
+        x1 = y1;
+        y1 = temp;
+        temp = dx;
+        dx = dy;
+        dy = temp;
+        temp = sx;
+        sx = sy;
+        sy = temp;
+        steep = true;
+    } else {
+        steep = false;
+    }
+
+    mp_int_t e = 2 * dy - dx;
+    for (mp_int_t i = 0; i < dx; ++i) {
+        if (steep) {
+            if (0 <= y1 && y1 < fb->width && 0 <= x1 && x1 < fb->height) {
+                setpixel(fb, y1, x1, col, alpha);
+            }
+        } else {
+            if (0 <= x1 && x1 < fb->width && 0 <= y1 && y1 < fb->height) {
+                setpixel(fb, x1, y1, col, alpha);
+            }
+        }
+        while (e >= 0) {
+            y1 += sy;
+            e -= 2 * dx;
+        }
+        x1 += sx;
+        e += 2 * dy;
+    }
+
+    if (draw_last) {
+        setpixel_checked(fb, x2, y2, col, 1, alpha);
+    }
+}
+#endif // MICROPY_PY_FRAMEBUF_ALPHA
 
 static mp_obj_t framebuf_make_new_helper(size_t n_args, const mp_obj_t *args_in, unsigned int buf_flags, mp_obj_framebuf_t *o) {
 
@@ -502,68 +631,6 @@ static mp_obj_t framebuf_rect(size_t n_args, const mp_obj_t *args_in) {
 }
 static MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(framebuf_rect_obj, 6, 8, framebuf_rect);
 
-static void line(const mp_obj_framebuf_t *fb, mp_int_t x1, mp_int_t y1, mp_int_t x2, mp_int_t y2, mp_int_t col, mp_int_t alpha) {
-    if (alpha <= 0) {
-        // nothing to do
-        return;
-    }
-    mp_int_t dx = x2 - x1;
-    mp_int_t sx;
-    if (dx > 0) {
-        sx = 1;
-    } else {
-        dx = -dx;
-        sx = -1;
-    }
-
-    mp_int_t dy = y2 - y1;
-    mp_int_t sy;
-    if (dy > 0) {
-        sy = 1;
-    } else {
-        dy = -dy;
-        sy = -1;
-    }
-
-    bool steep;
-    if (dy > dx) {
-        mp_int_t temp;
-        temp = x1;
-        x1 = y1;
-        y1 = temp;
-        temp = dx;
-        dx = dy;
-        dy = temp;
-        temp = sx;
-        sx = sy;
-        sy = temp;
-        steep = true;
-    } else {
-        steep = false;
-    }
-
-    mp_int_t e = 2 * dy - dx;
-    for (mp_int_t i = 0; i < dx; ++i) {
-        if (steep) {
-            if (0 <= y1 && y1 < fb->width && 0 <= x1 && x1 < fb->height) {
-                setpixel(fb, y1, x1, col, alpha);
-            }
-        } else {
-            if (0 <= x1 && x1 < fb->width && 0 <= y1 && y1 < fb->height) {
-                setpixel(fb, x1, y1, col, alpha);
-            }
-        }
-        while (e >= 0) {
-            y1 += sy;
-            e -= 2 * dx;
-        }
-        x1 += sx;
-        e += 2 * dy;
-    }
-
-    setpixel_checked(fb, x2, y2, col, 1, alpha);
-}
-
 static mp_obj_t framebuf_line(size_t n_args, const mp_obj_t *args_in) {
     (void)n_args;
 
@@ -571,7 +638,7 @@ static mp_obj_t framebuf_line(size_t n_args, const mp_obj_t *args_in) {
     mp_int_t args[5]; // x1, y1, x2, y2, col
     framebuf_args(args_in, args, 5);
 
-    line(self, args[0], args[1], args[2], args[3], args[4], FRAMEBUF_GET_ALPHA_ARG(6));
+    line(self, args[0], args[1], args[2], args[3], args[4], FRAMEBUF_GET_ALPHA_ARG(6), true);
 
     return mp_const_none;
 }
@@ -768,7 +835,7 @@ static mp_obj_t framebuf_poly(size_t n_args, const mp_obj_t *args_in) {
                         // Even though this is a hline and would be faster to
                         // use fill_rect, use line() because it handles x2 <
                         // x1.
-                        line(self, x + px1, y + py1, x + px2, y + py2, col, alpha);
+                        line(self, x + px1, y + py1, x + px2, y + py2, col, alpha, true);
                     }
                 }
 
@@ -808,10 +875,12 @@ static mp_obj_t framebuf_poly(size_t n_args, const mp_obj_t *args_in) {
         do {
             mp_int_t py2 = poly_int(&bufinfo, i--);
             mp_int_t px2 = poly_int(&bufinfo, i--);
-            line(self, x + px1, y + py1, x + px2, y + py2, col, alpha);
+            line(self, x + px1, y + py1, x + px2, y + py2, col, alpha, false);
             px1 = px2;
             py1 = py2;
         } while (i >= 0);
+        // always set last point
+        setpixel_checked(self, x + px1, y + py1, col, 1, alpha);
     }
 
     return mp_const_none;
