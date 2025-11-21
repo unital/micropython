@@ -29,6 +29,7 @@
 
 #include "py/runtime.h"
 #include "py/binary.h"
+#include "py/misc.h"
 
 #if MICROPY_PY_FRAMEBUF
 
@@ -243,6 +244,7 @@ static mp_framebuf_p_t formats[] = {
 
 
 #if MICROPY_PY_FRAMEBUF_ALPHA
+
 #ifndef FRAMEBUF_GET_ALPHA_ARG
 #define FRAMEBUF_GET_ALPHA_ARG(idx) ((n_args > idx) ? mp_obj_get_int(args_in[idx]) : 0x100)
 #endif // GET_ALPHA_ARG
@@ -978,7 +980,7 @@ static mp_obj_t framebuf_poly(size_t n_args, const mp_obj_t *args_in) {
 
                 if (current.x >= 0) {
                     // pixel is inside the buffer, so draw the pixel
-                    setpixel(self, current.x, row, col, (__builtin_popcount(mask) * alpha) >> 3);
+                    setpixel(self, current.x, row, col, (mp_popcount(mask) * alpha) >> 3);
                 }
 
                 // extend mask by last bits
@@ -992,7 +994,7 @@ static mp_obj_t framebuf_poly(size_t n_args, const mp_obj_t *args_in) {
                     } else {
                         width = self->width - current.x - 1;
                     }
-                    fill_rect(self, current.x + 1, row, width, 1, col, (__builtin_popcount(mask) * alpha) >> 3);
+                    fill_rect(self, current.x + 1, row, width, 1, col, (mp_popcount(mask) * alpha) >> 3);
                 }
             }
         }
