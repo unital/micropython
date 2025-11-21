@@ -233,32 +233,32 @@ col_fill = 0x99
 
 # Draw the line polygon (at the origin) and the reversed-order polygon (offset).
 fbuf.fill(0)
-fbuf.poly(0, 0, poly, col, False, 0x7f)
-fbuf.poly(15, -2, poly_reversed, col, False, 0x7f)
+fbuf.poly(0, 0, poly, col, False, 0x7F)
+fbuf.poly(15, -2, poly_reversed, col, False, 0x7F)
 print_buffer(buf, w, h)
 print()
 
 # Same but filled.
 fbuf.fill(0)
-fbuf.poly(0, 0, poly, col_fill, True, 0x7f)
-fbuf.poly(15, -2, poly_reversed, col_fill, True, 0x7f)
+fbuf.poly(0, 0, poly, col_fill, True, 0x7F)
+fbuf.poly(15, -2, poly_reversed, col_fill, True, 0x7F)
 print_buffer(buf, w, h)
 print()
 
 # Draw the fill then the outline to ensure that no fill goes outside the outline.
 fbuf.fill(0)
-fbuf.poly(0, 0, poly, col_fill, True, 0x7f)
-fbuf.poly(0, 0, poly, col, False, 0x7f)
-fbuf.poly(15, -2, poly, col_fill, True, 0x7f)
-fbuf.poly(15, -2, poly, col, False, 0x7f)
+fbuf.poly(0, 0, poly, col_fill, True, 0x7F)
+fbuf.poly(0, 0, poly, col, False, 0x7F)
+fbuf.poly(15, -2, poly, col_fill, True, 0x7F)
+fbuf.poly(15, -2, poly, col, False, 0x7F)
 print_buffer(buf, w, h)
 print()
 
 # Draw the outline then the fill to ensure the fill completely covers the outline.
 fbuf.fill(0)
-fbuf.poly(0, 0, poly, col, False, 0x7f)
-fbuf.poly(0, 0, poly, col_fill, True, 0x7f)
-fbuf.poly(15, -2, poly, col, False, 0x7f)
-fbuf.poly(15, -2, poly, col_fill, True, 0x7f)
+fbuf.poly(0, 0, poly, col, False, 0x7F)
+fbuf.poly(0, 0, poly, col_fill, True, 0x7F)
+fbuf.poly(15, -2, poly, col, False, 0x7F)
+fbuf.poly(15, -2, poly, col_fill, True, 0x7F)
 print_buffer(buf, w, h)
 print()

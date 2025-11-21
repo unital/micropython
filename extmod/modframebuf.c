@@ -776,23 +776,47 @@ typedef struct edge {
     mp_int_t slope;
 } edge;
 
-static void insert_edge(edge *edge_table, int n_edges, mp_int_t py1, mp_int_t py2, mp_int_t px1, mp_int_t slope) {
+static void insert_edge(edge* edge_table, size_t n_edges, mp_int_t py1, mp_int_t py2, mp_int_t px1, mp_int_t slope) {
     edge e = {
         py1,
         py2,
-        px1,
+        px1 + (slope >> 2), // bump to first sub-scanline intersection (increment by a quarter of the slope)
         slope,
     };
     edge current;
-    // simple linear insert: could do binary insert more efficiently and/or use memcpy
-    for (int i = 0; i < n_edges; ++i) {
+    // simple linear ordered insertion
+    for (size_t i = 0; i < n_edges; ++i) {
         current = edge_table[i];
-        if (e.y1 <= current.y1 || (e.y1 == current.y1 && e.x1 <= current.x1)) {
+        if (e.y1 <= current.y1) {
             edge_table[i] = e;
             e = current;
         }
     }
     edge_table[n_edges] = e;
+}
+
+typedef struct node {
+    mp_int_t x;
+    uint8_t mask;
+} node;
+
+static size_t insert_node(node* node_table, size_t n_nodes, mp_int_t x, uint8_t mask) {
+    node n = {x, mask};
+    node current;
+    // simple linear ordered insertion
+    for (size_t i = 0; i < n_nodes; ++i) {
+        current = node_table[i];
+        if (n.x == current.x) {
+            n.mask = n.mask ^ current.mask;
+            node_table[i] = n;
+            return 0;
+        } else if (n.x < current.x) {
+            node_table[i] = n;
+            n = current;
+        }
+    }
+    node_table[n_nodes] = n;
+    return 1;
 }
 
 static mp_obj_t framebuf_poly(size_t n_args, const mp_obj_t *args_in) {
@@ -804,18 +828,23 @@ static mp_obj_t framebuf_poly(size_t n_args, const mp_obj_t *args_in) {
     mp_buffer_info_t bufinfo;
     mp_get_buffer_raise(args_in[3], &bufinfo, MP_BUFFER_READ);
     // If an odd number of values was given, this rounds down to multiple of two.
-    int n_poly = bufinfo.len / (mp_binary_get_size('@', bufinfo.typecode, NULL) * 2);
+    size_t n_poly = bufinfo.len / (mp_binary_get_size('@', bufinfo.typecode, NULL) * 2);
 
     if (n_poly == 0) {
+        // Nothing to do.
         return mp_const_none;
     }
 
     mp_int_t col = mp_obj_get_int(args_in[4]);
     bool fill = n_args > 5 && mp_obj_is_true(args_in[5]);
     mp_int_t alpha = FRAMEBUF_GET_ALPHA_ARG(6);
+    if (alpha <= 0) {
+        // Nothing to do.
+        return mp_const_none;
+    }
 
     if (fill) {
-        // This implements a variant of the A-buffer algorithm for polygon fill.
+        // This implements an integer version of the A-buffer algorithm for antialiased polygon fill.
 
         // We compute two scanlines per row, one at -0.25 and one at +0.25 from
         // the pixel center (where the integer coordinates are). Each scanline
@@ -828,40 +857,51 @@ static mp_obj_t framebuf_poly(size_t n_args, const mp_obj_t *args_in) {
         //   +---+---+ +0.5
         // -0.5  0 +0.5
         //
-        // Where an edge intersects a scanline, we set a bit mask of all to the
-        // right of it, and xor that with the mask from the previous edges.
+        // Where an edge intersects a scanline, we round and set a bit mask of all
+        // bits to the right of it, and xor that with the mask from the previous edges.
         //
         // When we move to the next pixel we copy the last bit on each scanline
         // and multiply by 0b1111 to extend it to the entire row, and use that as
         // the initial mask for that pixel.
+        //
+        // Original paper: https://dl.acm.org/doi/pdf/10.1145/964965.808585
+        // Explanation in the context of embedded systems: https://aykevl.nl/2024/02/tinygl-polygon/
+        // We don't use a lookup table.
 
         // Build a table of edges and data
-        // The table consists of entries (y_min, y_max, x_min, 1/slope)
+        // The table consists of entries (y_min, y_max, x_min, 1/slope) and is ordered by y_min.
+        // The value of 1/slope is stored with 12 bits of fixed precision.
+        // Horizontal lines are ignored.
         edge edge_table[n_poly];
-        mp_int_t n_edges = 0;
-        mp_int_t px1 = poly_int(&bufinfo, 2*n_poly-2);
-        mp_int_t py1 = poly_int(&bufinfo, 2*n_poly-1);
-        mp_int_t y_start = self->height - y;
-        mp_int_t y_end = 0 - y;
+        size_t n_edges = 0;
+        mp_int_t px1 = x + poly_int(&bufinfo, 2 * n_poly - 2);
+        mp_int_t py1 = y + poly_int(&bufinfo, 2 * n_poly - 1);
+        mp_int_t y_start = py1;
+        mp_int_t y_end = py1 + 1;
         mp_int_t x_start = px1;
         mp_int_t x_end = px1;
-        for (int i = 0; i < n_poly; ++i) {
-            mp_int_t px2 = poly_int(&bufinfo, 2*i);
-            mp_int_t py2 = poly_int(&bufinfo, 2*i + 1);
+        for (size_t i = 0; i < n_poly; ++i) {
+            mp_int_t px2 = x + poly_int(&bufinfo, 2 * i);
+            mp_int_t py2 = y + poly_int(&bufinfo, 2 * i + 1);
+
             // track the min and max extent of the polygon
             y_start = MIN(y_start, py2);
-            y_end = MAX(y_end, py2);
+            y_end = MAX(y_end, py2 + 1);
             x_start = MIN(x_start, px2);
             x_end = MAX(x_end, px2);
 
-            if (py1 < py2) { // going up
-                if (py1 >= y || py2 <= y + self->height) { // intersects screen vertically
-                    insert_edge(edge_table, n_edges, py1, py2, px1, ((px2 - px1) << 12) / (py2 - py1));
+            if (py1 < py2) {
+                // going up
+                if (py1 <= self->height || py2 >= 0) {
+                    // intersects buffer vertically
+                    insert_edge(edge_table, n_edges, py1, py2, px1 << 12, ((px2 - px1) << 12) / (py2 - py1));
                     ++n_edges;
                 }
-            } else if (py1 > py2) { // going down
-                if (py2 >= y || py1 <= y + self->height) { // intersects screen vertically
-                    insert_edge(edge_table, n_edges, py2, py1, px2, ((px2 - px1) << 12) / (py2 - py1));
+            } else if (py1 > py2) {
+                // going down
+                if (py2 <= self->height || py1 >= 0) {
+                    // intersects buffer vertically
+                    insert_edge(edge_table, n_edges, py2, py1, px2 << 12, ((px2 - px1) << 12) / (py2 - py1));
                     ++n_edges;
                 }
             } // ... and ignore horizontal edges
@@ -869,76 +909,91 @@ static mp_obj_t framebuf_poly(size_t n_args, const mp_obj_t *args_in) {
             px1 = px2;
             py1 = py2;
         }
+        y_start = MAX(0, y_start);
+        y_end = MIN(self->height, y_end);
 
-        int last_edge_index = 0;
-        mp_int_t scanline_intersects[n_edges][2];
-        int n_intersects[2];
+        // Track edges which intersect scanlines.
+        size_t last_edge_index = 0;
 
-        for (mp_int_t row = y_start; row <= y_end; row++) {
-            uint8_t mask = 0;
-
+        for (mp_int_t row = y_start; row < y_end; row++) {
+            // Add any new edges that may intersect the subsample lines to those we consider.
             while (last_edge_index < n_edges && edge_table[last_edge_index].y1 <= row) {
                 ++last_edge_index;
             }
 
-            n_intersects[0] = 0;
-            n_intersects[1] = 0;
+            size_t n_nodes = 0;
+            node nodes[2 * last_edge_index];
+
             for (mp_int_t line = 0; line < 2; ++line) {
+                // For each subsample line...
+                // Get y-value with 2 bits of fixed precision
                 mp_int_t y1 = (line == 0) ? ((row << 2) - 1) : ((row << 2) + 1);
-                for (int i = 0; i < last_edge_index; ++i) {
-                    edge e = edge_table[i];
-                    if ((e.y2 << 2) < y1) {
+                for (size_t i = 0; i < last_edge_index; ++i) {
+                    // For each edge...
+                    edge* e = &(edge_table[i]);
+                    if ((e->y2 << 2) < y1) {
+                        // Edge below subsample line.
                         continue;
-                    } else if ((e.y1 << 2) > y1) {
+                    } else if ((e->y1 << 2) > y1) {
+                        // Edge above subsample line (can happen for lower subsample line at start of edge).
                         continue;
                     }
-                    // round x-value to nearest 0.25 using an additional 12-bits of precision
-                    mp_int_t x1 = (e.x1 << 2) + (((y1 - (e.y1 << 2)) * e.slope + (1 << 11)) >> 12);
-                    // XXX binary insertion?
-                    for (int j=0; j < n_intersects[line]; j++) {
-                        mp_int_t current = scanline_intersects[j][line];
-                        if (current > x1) {
-                            scanline_intersects[j][line] = x1;
-                            x1 = current;
-                        }
+                    // Find pixel and sub-pixel offsets.
+                    // We adjust x so integer coordinates are in the center of each pixel and intersections
+                    // with subsample pixels round to nearest quarter.  This makes the antialiased values
+                    // symmetric when given a symmetric shape.
+                    mp_int_t x_adjusted = e->x1 + (1 << 11) + (1 << 9);
+                    mp_int_t column = x_adjusted >> 12;
+                    if (column >= self->width) {
+                        // Outside of buffer on the high end, don't care about these points,
+                        // but need to bump the x-value in case line eventually comes inside the buffer.
+                        e->x1 += (e->slope >> 1);
+                        continue;
                     }
-                    scanline_intersects[n_intersects[line]][line] = x1;
-                    ++n_intersects[line];
+                    mp_int_t subpixel_offset = (x_adjusted - (column << 12)) >> 10;
+
+                    // Compute mask for subpixel scanline.
+                    uint8_t mask = ((1 << (4 - subpixel_offset)) - 1) << (4 * line);
+
+                    // Insert the node, xor-ing the mask if there is a column match, otherwise sorting.
+                    n_nodes += insert_node(nodes, n_nodes, column, mask);
+
+                    // Bump edge x value to next sub-scanline (increments by half the slope).
+                    e->x1 += (e->slope >> 1);
                 }
+            }
+            if (!n_nodes) {
+                // No intersections we care about, go to next row.
+                continue;
             }
 
-            int column;
-            if (n_intersects[0] != 0) {
-                if (n_intersects[1] != 0) {
-                    column = MIN(scanline_intersects[0][0], scanline_intersects[0][1]) >> 2;
-                } else {
-                    column = scanline_intersects[0][0] >> 2;
+            // Now draw the pixels.
+            uint8_t mask = 0;
+            node current;
+            for (size_t i = 0; i < n_nodes; ++i) {
+                current = nodes[i];
+
+                // Update the mask
+                mask ^= current.mask;
+
+                if (current.x >= 0) {
+                    // pixel is inside the buffer, so draw the pixel
+                    setpixel(self, current.x, row, col, (__builtin_popcount(mask) * alpha) >> 3);
                 }
-            } else {
-                if (n_intersects[1] != 0) {
-                    column = scanline_intersects[0][1] >> 2;
-                } else {
-                    // blank line - shouldn't happen
-                    continue;
-                }
-            }
-            int intersect_indices[2] = {0, 0};
-            while (intersect_indices[0] < n_intersects[0] || intersect_indices[1] < n_intersects[1]) {
-                for (mp_int_t line = 0; line < 2; ++line) {
-                    if (intersect_indices[line] >= n_intersects[line]) {
-                        continue;
-                    }
-                    mp_int_t x1 = scanline_intersects[intersect_indices[line]][line] - (column << 2) + 2;
-                    while ((x1 >= 0) && (x1 < 4)) {
-                        mask ^= (0b1111 >> x1) << (4 * line);
-                        ++intersect_indices[line];
-                        if (intersect_indices[line] > n_intersects[line]) {break;};
-                        x1 = scanline_intersects[intersect_indices[line]][line] - (column << 2) + 2;
-                    }
-                }
-                setpixel_checked(self, x + column, y + row, col, 1, (__builtin_popcount(mask) * alpha) >> 3);
+
+                // extend mask by last bits
                 mask = (mask & 0b00010001) * 0b1111;
-                column++;
+
+                if (mask) {
+                    // fill with run of pixels with same mask - can be fast
+                    mp_int_t width;
+                    if (i + 1 < n_nodes) {
+                        width = nodes[i+1].x - current.x - 1;
+                    } else {
+                        width = self->width - current.x - 1;
+                    }
+                    fill_rect(self, current.x + 1, row, width, 1, col, (__builtin_popcount(mask) * alpha) >> 3);
+                }
             }
         }
     } else {
@@ -953,7 +1008,7 @@ static mp_obj_t framebuf_poly(size_t n_args, const mp_obj_t *args_in) {
             px1 = px2;
             py1 = py2;
         } while (i >= 0);
-        // draw endpoint of last line if poly is not closed
+        // draw endpoint of last line if polygon is not closed
         if (px1 != poly_int(&bufinfo, 0) || py1 != poly_int(&bufinfo, 1)) {
             setpixel_checked(self, x + px1, y + py1, col, 1, alpha);
         }
