@@ -800,7 +800,7 @@ typedef struct node {
     uint8_t mask;
 } node;
 
-static size_t insert_node(node* node_table, size_t n_nodes, mp_int_t x, uint8_t mask) {
+static size_t insert_node(node* node_table, size_t n_nodes, mp_int_t x, uint16_t mask) {
     node n = {x, mask};
     node current;
     // simple linear ordered insertion
@@ -953,7 +953,7 @@ static mp_obj_t framebuf_poly(size_t n_args, const mp_obj_t *args_in) {
                     mp_int_t subpixel_offset = (x_adjusted - (column << 12)) >> 10;
 
                     // Compute mask for subpixel scanline.
-                    uint8_t mask = ((1 << (4 - subpixel_offset)) - 1) << (4 * line);
+                    uint16_t mask = ((1 << (4 - subpixel_offset)) - 1) << (line << 2);
 
                     // Insert the node, xor-ing the mask if there is a column match, otherwise sorting.
                     n_nodes += insert_node(nodes, n_nodes, column, mask);
@@ -968,7 +968,7 @@ static mp_obj_t framebuf_poly(size_t n_args, const mp_obj_t *args_in) {
             }
 
             // Now draw the pixels.
-            uint8_t mask = 0;
+            uint16_t mask = 0;
             node current;
             for (size_t i = 0; i < n_nodes; ++i) {
                 current = nodes[i];
