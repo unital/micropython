@@ -57,13 +57,14 @@ typedef struct _mp_framebuf_p_t {
 } mp_framebuf_p_t;
 
 // constants for formats
-#define FRAMEBUF_MVLSB    (0)
-#define FRAMEBUF_RGB565   (1)
-#define FRAMEBUF_GS2_HMSB (5)
-#define FRAMEBUF_GS4_HMSB (2)
-#define FRAMEBUF_GS8      (6)
-#define FRAMEBUF_MHLSB    (3)
-#define FRAMEBUF_MHMSB    (4)
+#define FRAMEBUF_MVLSB     (0)
+#define FRAMEBUF_RGB565    (1)
+#define FRAMEBUF_RGB565_BS (7)
+#define FRAMEBUF_GS2_HMSB  (5)
+#define FRAMEBUF_GS4_HMSB  (2)
+#define FRAMEBUF_GS8       (6)
+#define FRAMEBUF_MHLSB     (3)
+#define FRAMEBUF_MHMSB     (4)
 
 // Functions for MHLSB and MHMSB
 
@@ -117,7 +118,10 @@ static void mvlsb_fill_rect(const mp_obj_framebuf_t *fb, unsigned int x, unsigne
     }
 }
 
-// Functions for RGB565 format
+// Functions for RGB565 and RGB565_BS format
+//
+// Internally we use 'native' and 'byte-swapped' formats, and then expose those as big- or little-
+// endian to Python as appropriate.
 
 static void rgb565_setpixel(const mp_obj_framebuf_t *fb, unsigned int x, unsigned int y, uint32_t col) {
     ((uint16_t *)fb->buf)[x + y * fb->stride] = col;
@@ -127,7 +131,20 @@ static uint32_t rgb565_getpixel(const mp_obj_framebuf_t *fb, unsigned int x, uns
     return ((uint16_t *)fb->buf)[x + y * fb->stride];
 }
 
+static void rgb565_bs_setpixel(const mp_obj_framebuf_t *fb, unsigned int x, unsigned int y, uint32_t col) {
+    col = __builtin_bswap16(col);
+    ((uint16_t *)fb->buf)[x + y * fb->stride] = col;
+}
+
+static uint32_t rgb565_bs_getpixel(const mp_obj_framebuf_t *fb, unsigned int x, unsigned int y) {
+    uint32_t col = ((uint16_t *)fb->buf)[x + y * fb->stride];
+    return __builtin_bswap16(col);
+}
+
 static void rgb565_fill_rect(const mp_obj_framebuf_t *fb, unsigned int x, unsigned int y, unsigned int w, unsigned int h, uint32_t col) {
+    if (fb->format == FRAMEBUF_RGB565_BS) {
+        col = __builtin_bswap16(col);
+    }
     uint16_t *b = &((uint16_t *)fb->buf)[x + y * fb->stride];
     while (h--) {
         for (unsigned int ww = w; ww; --ww) {
@@ -234,6 +251,7 @@ static void gs8_fill_rect(const mp_obj_framebuf_t *fb, unsigned int x, unsigned 
 static mp_framebuf_p_t formats[] = {
     [FRAMEBUF_MVLSB] = {mvlsb_setpixel, mvlsb_getpixel, mvlsb_fill_rect},
     [FRAMEBUF_RGB565] = {rgb565_setpixel, rgb565_getpixel, rgb565_fill_rect},
+    [FRAMEBUF_RGB565_BS] = {rgb565_bs_setpixel, rgb565_bs_getpixel, rgb565_fill_rect},
     [FRAMEBUF_GS2_HMSB] = {gs2_hmsb_setpixel, gs2_hmsb_getpixel, gs2_hmsb_fill_rect},
     [FRAMEBUF_GS4_HMSB] = {gs4_hmsb_setpixel, gs4_hmsb_getpixel, gs4_hmsb_fill_rect},
     [FRAMEBUF_GS8] = {gs8_setpixel, gs8_getpixel, gs8_fill_rect},
@@ -310,6 +328,7 @@ static mp_obj_t framebuf_make_new_helper(size_t n_args, const mp_obj_t *args_in,
             bpp = 8;
             break;
         case FRAMEBUF_RGB565:
+        case FRAMEBUF_RGB565_BS:
             bpp = 16;
             break;
         default:
@@ -909,6 +928,13 @@ static const mp_rom_map_elem_t framebuf_module_globals_table[] = {
     { MP_ROM_QSTR(MP_QSTR_MVLSB), MP_ROM_INT(FRAMEBUF_MVLSB) },
     { MP_ROM_QSTR(MP_QSTR_MONO_VLSB), MP_ROM_INT(FRAMEBUF_MVLSB) },
     { MP_ROM_QSTR(MP_QSTR_RGB565), MP_ROM_INT(FRAMEBUF_RGB565) },
+    #if MP_ENDIANNESS_LITTLE
+    { MP_ROM_QSTR(MP_QSTR_RGB565_LE), MP_ROM_INT(FRAMEBUF_RGB565) },
+    { MP_ROM_QSTR(MP_QSTR_RGB565_BE), MP_ROM_INT(FRAMEBUF_RGB565_BS) },
+    #elif MP_ENDIANNESS_BIG
+    { MP_ROM_QSTR(MP_QSTR_RGB565_BE), MP_ROM_INT(FRAMEBUF_RGB565) },
+    { MP_ROM_QSTR(MP_QSTR_RGB565_LE), MP_ROM_INT(FRAMEBUF_RGB565_BS) },
+    #endif // MP_ENDIANNESS_...
     { MP_ROM_QSTR(MP_QSTR_GS2_HMSB), MP_ROM_INT(FRAMEBUF_GS2_HMSB) },
     { MP_ROM_QSTR(MP_QSTR_GS4_HMSB), MP_ROM_INT(FRAMEBUF_GS4_HMSB) },
     { MP_ROM_QSTR(MP_QSTR_GS8), MP_ROM_INT(FRAMEBUF_GS8) },
