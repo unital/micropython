@@ -778,7 +778,7 @@ typedef struct edge {
     mp_int_t slope;
 } edge;
 
-static void insert_edge(edge* edge_table, size_t n_edges, mp_int_t py1, mp_int_t py2, mp_int_t px1, mp_int_t slope) {
+static void insert_edge(edge* edge_table, int n_edges, mp_int_t py1, mp_int_t py2, mp_int_t px1, mp_int_t slope) {
     edge e = {
         py1,
         py2,
@@ -787,7 +787,7 @@ static void insert_edge(edge* edge_table, size_t n_edges, mp_int_t py1, mp_int_t
     };
     edge current;
     // simple linear ordered insertion
-    for (size_t i = 0; i < n_edges; ++i) {
+    for (int i = 0; i < n_edges; ++i) {
         current = edge_table[i];
         if (e.y1 <= current.y1) {
             edge_table[i] = e;
@@ -802,11 +802,11 @@ typedef struct node {
     uint32_t mask;
 } node;
 
-static size_t insert_node(node* node_table, size_t n_nodes, mp_int_t x, uint32_t mask) {
+static int insert_node(node* node_table, int n_nodes, mp_int_t x, uint32_t mask) {
     node n = {x, mask};
     node current;
     // simple linear ordered insertion
-    for (size_t i = 0; i < n_nodes; ++i) {
+    for (int i = 0; i < n_nodes; ++i) {
         current = node_table[i];
         if (n.x == current.x) {
             n.mask = n.mask ^ current.mask;
@@ -830,7 +830,7 @@ static mp_obj_t framebuf_poly(size_t n_args, const mp_obj_t *args_in) {
     mp_buffer_info_t bufinfo;
     mp_get_buffer_raise(args_in[3], &bufinfo, MP_BUFFER_READ);
     // If an odd number of values was given, this rounds down to multiple of two.
-    size_t n_poly = bufinfo.len / (mp_binary_get_size('@', bufinfo.typecode, NULL) * 2);
+    int n_poly = bufinfo.len / (mp_binary_get_size('@', bufinfo.typecode, NULL) * 2);
 
     if (n_poly == 0) {
         // Nothing to do.
@@ -881,14 +881,14 @@ static mp_obj_t framebuf_poly(size_t n_args, const mp_obj_t *args_in) {
         }
 
         edge edge_table[n_poly];
-        size_t n_edges = 0;
+        int n_edges = 0;
         mp_int_t px1 = x + poly_int(&bufinfo, 2 * n_poly - 2);
         mp_int_t py1 = y + poly_int(&bufinfo, 2 * n_poly - 1);
         mp_int_t y_start = py1;
         mp_int_t y_end = py1 + 1;
         mp_int_t x_start = px1;
         mp_int_t x_end = px1;
-        for (size_t i = 0; i < n_poly; ++i) {
+        for (int i = 0; i < n_poly; ++i) {
             mp_int_t px2 = x + poly_int(&bufinfo, 2 * i);
             mp_int_t py2 = y + poly_int(&bufinfo, 2 * i + 1);
 
@@ -921,7 +921,7 @@ static mp_obj_t framebuf_poly(size_t n_args, const mp_obj_t *args_in) {
         y_end = MIN(self->height, y_end);
 
         // Track edges which intersect scanlines.
-        size_t last_edge_index = 0;
+        int last_edge_index = 0;
 
         for (mp_int_t row = y_start; row < y_end; row++) {
             // Add any new edges that may intersect the subsample lines to those we consider.
@@ -929,14 +929,14 @@ static mp_obj_t framebuf_poly(size_t n_args, const mp_obj_t *args_in) {
                 ++last_edge_index;
             }
 
-            size_t n_nodes = 0;
+            int n_nodes = 0;
             node nodes[2 * last_edge_index];
 
             for (mp_int_t line = 0; line < 2; ++line) {
                 // For each subsample line...
                 // Get y-value with 2 bits of fixed precision
                 mp_int_t y1 = (line == 0) ? ((row << 2) - 1) : ((row << 2) + 1);
-                for (size_t i = 0; i < last_edge_index; ++i) {
+                for (int i = 0; i < last_edge_index; ++i) {
                     // For each edge...
                     edge* e = &(edge_table[i]);
                     if ((e->y2 << 2) < y1) {
@@ -978,7 +978,7 @@ static mp_obj_t framebuf_poly(size_t n_args, const mp_obj_t *args_in) {
             // Now draw the pixels.
             uint32_t mask = 0;
             node current;
-            for (size_t i = 0; i < n_nodes; ++i) {
+            for (int i = 0; i < n_nodes; ++i) {
                 current = nodes[i];
 
                 // Update the mask
