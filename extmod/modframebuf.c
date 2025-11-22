@@ -874,6 +874,12 @@ static mp_obj_t framebuf_poly(size_t n_args, const mp_obj_t *args_in) {
         // The table consists of entries (y_min, y_max, x_min, 1/slope) and is ordered by y_min.
         // The value of 1/slope is stored with 12 bits of fixed precision.
         // Horizontal lines are ignored.
+
+        if (self->format == FRAMEBUF_MHLSB || self->format == FRAMEBUF_MHMSB || self->format == FRAMEBUF_MVLSB) {
+            // Increase alpha for mono to get sharp corners.
+            alpha *= 2;
+        }
+
         edge edge_table[n_poly];
         size_t n_edges = 0;
         mp_int_t px1 = x + poly_int(&bufinfo, 2 * n_poly - 2);

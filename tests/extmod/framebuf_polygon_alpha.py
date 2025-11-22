@@ -25,6 +25,22 @@ def print_buffer(buffer, width, height):
         print()
 
 
+def print_buffer_mono(fbuf, width, height):
+    for row in range(height):
+        for col in range(width):
+            val = fbuf.pixel(col, row)
+            print(" **" if val else " ..", end="")
+        print()
+
+
+def print_buffer_gs2(fbuf, width, height):
+    for row in range(height):
+        for col in range(width):
+            val = fbuf.pixel(col, row)
+            print(" {:02b}".format(val) if val else " ..", end="")
+        print()
+
+
 buf = bytearray(70 * 70)
 
 w = 30
@@ -192,6 +208,14 @@ fbuf.poly(0, 0, poly_wrong_length, col)
 print_buffer(buf, w, h)
 print()
 
+fbuf.fill(0)
+fbuf.poly(0, 0, poly_empty, col, True)
+fbuf.poly(0, 0, poly_one, col, True)
+fbuf.poly(0, 0, poly_two, col, True)
+fbuf.poly(0, 0, poly_wrong_length, col, True)
+print_buffer(buf, w, h)
+print()
+
 # A shape with a horizontal overhang.
 poly_overhang = array("h", (0, 0, 0, 5, 5, 5, 5, 10, 10, 10, 10, 0))
 
@@ -261,4 +285,91 @@ fbuf.poly(0, 0, poly, col_fill, True, 0x7F)
 fbuf.poly(15, -2, poly, col, False, 0x7F)
 fbuf.poly(15, -2, poly, col_fill, True, 0x7F)
 print_buffer(buf, w, h)
+print()
+
+# Test 1-bit cases
+w = 30
+h = 25
+fbuf = framebuf.FrameBuffer(buf, w, h, framebuf.MONO_HLSB)
+col = 1
+col_fill = 1
+
+# Draw the line polygon (at the origin) and the reversed-order polygon (offset).
+fbuf.fill(0)
+fbuf.poly(0, 0, poly, col, False)
+fbuf.poly(15, -2, poly_reversed, col, False)
+print_buffer_mono(fbuf, w, h)
+print()
+
+# Draw the line polygon (at the origin) and the reversed-order polygon (offset).
+fbuf.fill(0)
+fbuf.poly(0, 0, poly, col, True)
+fbuf.poly(15, -2, poly_reversed, col, True)
+print_buffer_mono(fbuf, w, h)
+print()
+
+# Draw the line polygon (at the origin) and the reversed-order polygon (offset).
+fbuf.fill(0)
+fbuf.poly(0, 0, poly, col, True)
+fbuf.poly(0, 0, poly, col, False)
+fbuf.poly(15, -2, poly_reversed, col, True)
+fbuf.poly(15, -2, poly_reversed, col, False)
+print_buffer_mono(fbuf, w, h)
+print()
+
+# Draw the line polygon (at the origin) and the reversed-order polygon (offset).
+fbuf.fill(0)
+fbuf.poly(0, 0, poly, col, False)
+fbuf.poly(0, 0, poly, col, True)
+fbuf.poly(15, -2, poly_reversed, col, False)
+fbuf.poly(15, -2, poly_reversed, col, True)
+print_buffer_mono(fbuf, w, h)
+print()
+
+fbuf.fill(0)
+fbuf.poly(0, 0, poly_empty, col)
+fbuf.poly(0, 0, poly_one, col)
+fbuf.poly(0, 0, poly_two, col)
+fbuf.poly(0, 0, poly_wrong_length, col)
+print_buffer_mono(fbuf, w, h)
+print()
+
+
+# Test 2-bit cases
+w = 30
+h = 25
+fbuf = framebuf.FrameBuffer(buf, w, h, framebuf.GS2_HMSB)
+col = 0b11
+col_fill = 0b11
+
+# Draw the line polygon (at the origin) and the reversed-order polygon (offset).
+fbuf.fill(0)
+fbuf.poly(0, 0, poly, col, False)
+fbuf.poly(15, -2, poly_reversed, col, False)
+print_buffer_gs2(fbuf, w, h)
+print()
+
+# Draw the line polygon (at the origin) and the reversed-order polygon (offset).
+fbuf.fill(0)
+fbuf.poly(0, 0, poly, col, True)
+fbuf.poly(15, -2, poly_reversed, col, True)
+print_buffer_gs2(fbuf, w, h)
+print()
+
+# Draw the line polygon (at the origin) and the reversed-order polygon (offset).
+fbuf.fill(0)
+fbuf.poly(0, 0, poly, col, True)
+fbuf.poly(0, 0, poly, col, False)
+fbuf.poly(15, -2, poly_reversed, col, True)
+fbuf.poly(15, -2, poly_reversed, col, False)
+print_buffer_gs2(fbuf, w, h)
+print()
+
+# Draw the line polygon (at the origin) and the reversed-order polygon (offset).
+fbuf.fill(0)
+fbuf.poly(0, 0, poly, col, False)
+fbuf.poly(0, 0, poly, col, True)
+fbuf.poly(15, -2, poly_reversed, col, False)
+fbuf.poly(15, -2, poly_reversed, col, True)
+print_buffer_gs2(fbuf, w, h)
 print()
