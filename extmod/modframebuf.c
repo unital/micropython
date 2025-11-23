@@ -245,7 +245,7 @@ static mp_framebuf_p_t formats[] = {
 #if MICROPY_PY_FRAMEBUF_ALPHA
 
 #ifndef FRAMEBUF_GET_ALPHA_ARG
-#define FRAMEBUF_GET_ALPHA_ARG(idx) ((n_args > idx) ? mp_obj_get_int(args_in[idx]) : 0x100)
+#define FRAMEBUF_GET_ALPHA_ARG(idx) ((n_args > idx) ? mp_obj_get_int(args_in[idx]) : 0xFF)
 #endif // GET_ALPHA_ARG
 
 typedef struct __attribute__((packed)) rgb565 {
@@ -313,7 +313,7 @@ static void fill_rect(const mp_obj_framebuf_t *fb, int x, int y, int w, int h, u
 #else // MICROPY_PY_FRAMEBUF_ALPHA
 
 #ifndef FRAMEBUF_GET_ALPHA_ARG
-#define FRAMEBUF_GET_ALPHA_ARG(idx) (0x100)
+#define FRAMEBUF_GET_ALPHA_ARG(idx) (0xFF)
 #endif // GET_ALPHA_ARG
 
 static inline void setpixel(const mp_obj_framebuf_t *fb, unsigned int x, unsigned int y, uint32_t col, mp_int_t alpha) {
@@ -346,132 +346,6 @@ static void setpixel_checked(const mp_obj_framebuf_t *fb, mp_int_t x, mp_int_t y
 static inline uint32_t getpixel(const mp_obj_framebuf_t *fb, unsigned int x, unsigned int y) {
     return formats[fb->format].getpixel(fb, x, y);
 }
-
-#if MICROPY_PY_FRAMEBUF_ALPHA
-static void line(const mp_obj_framebuf_t *fb, mp_int_t x1, mp_int_t y1, mp_int_t x2, mp_int_t y2, mp_int_t col, mp_int_t alpha, bool draw_last) {
-    setpixel_checked(fb, x1, y1, col, 1, alpha);
-    if (x1 == x2 && y1 == y2) {
-        // nothing more to do
-        return;
-    }
-    if (draw_last) {
-        setpixel_checked(fb, x2, y2, col, 1, alpha);
-    }
-
-    mp_int_t dx = x2 - x1;
-    mp_int_t dy = y2 - y1;
-    if (dx + dy < 0) {
-        // swap ends
-        mp_int_t temp;
-        dx = -dx;
-        dy = -dy;
-        temp = x1;
-        x1 = x2;
-        x2 = temp;
-        temp = y1;
-        y1 = y2;
-        y2 = temp;
-    }
-
-    bool steep;
-    if (dy > dx || dy < -dx) {
-        // swap x and y
-        mp_int_t temp;
-        temp = x1;
-        x1 = y1;
-        y1 = temp;
-        temp = dx;
-        dx = dy;
-        dy = temp;
-        steep = true;
-    } else {
-        steep = false;
-    }
-
-    // Fixed point with 8 bits of fractional part.
-    // dx != 0 is guaranteed
-    mp_int_t gradient = ((dy * 256) / dx);
-
-    mp_int_t y_intercept = (y1 * 256) + gradient;
-    if (steep) {
-        for (mp_int_t x = x1 + 1; x < x1 + dx; ++x) {
-            setpixel_checked(fb, y_intercept >> 8, x, col, 1, (alpha * (0x100 - (y_intercept & 0xff))) >> 8);
-            setpixel_checked(fb, (y_intercept >> 8) + 1, x, col, 1, (alpha * (y_intercept & 0xff)) >> 8);
-            y_intercept += gradient;
-        }
-    } else {
-        for (mp_int_t x = x1 + 1; x < x1 + dx; ++x) {
-            setpixel_checked(fb, x, y_intercept >> 8, col, 1, (alpha * (0x100 - (y_intercept & 0xff))) >> 8);
-            setpixel_checked(fb, x, (y_intercept >> 8) + 1, col, 1, (alpha * (y_intercept & 0xff)) >> 8);
-            y_intercept += gradient;
-        }
-    }
-}
-#else // MICROPY_PY_FRAMEBUF_ALPHA
-static void line(const mp_obj_framebuf_t *fb, mp_int_t x1, mp_int_t y1, mp_int_t x2, mp_int_t y2, mp_int_t col, mp_int_t alpha, bool draw_last) {
-    if (alpha <= 0) {
-        // nothing to do
-        return;
-    }
-    mp_int_t dx = x2 - x1;
-    mp_int_t sx;
-    if (dx > 0) {
-        sx = 1;
-    } else {
-        dx = -dx;
-        sx = -1;
-    }
-
-    mp_int_t dy = y2 - y1;
-    mp_int_t sy;
-    if (dy > 0) {
-        sy = 1;
-    } else {
-        dy = -dy;
-        sy = -1;
-    }
-
-    bool steep;
-    if (dy > dx) {
-        mp_int_t temp;
-        temp = x1;
-        x1 = y1;
-        y1 = temp;
-        temp = dx;
-        dx = dy;
-        dy = temp;
-        temp = sx;
-        sx = sy;
-        sy = temp;
-        steep = true;
-    } else {
-        steep = false;
-    }
-
-    mp_int_t e = 2 * dy - dx;
-    for (mp_int_t i = 0; i < dx; ++i) {
-        if (steep) {
-            if (0 <= y1 && y1 < fb->width && 0 <= x1 && x1 < fb->height) {
-                setpixel(fb, y1, x1, col, alpha);
-            }
-        } else {
-            if (0 <= x1 && x1 < fb->width && 0 <= y1 && y1 < fb->height) {
-                setpixel(fb, x1, y1, col, alpha);
-            }
-        }
-        while (e >= 0) {
-            y1 += sy;
-            e -= 2 * dx;
-        }
-        x1 += sx;
-        e += 2 * dy;
-    }
-
-    if (draw_last) {
-        setpixel_checked(fb, x2, y2, col, 1, alpha);
-    }
-}
-#endif // MICROPY_PY_FRAMEBUF_ALPHA
 
 static mp_obj_t framebuf_make_new_helper(size_t n_args, const mp_obj_t *args_in, unsigned int buf_flags, mp_obj_framebuf_t *o) {
 
@@ -632,6 +506,136 @@ static mp_obj_t framebuf_rect(size_t n_args, const mp_obj_t *args_in) {
 }
 static MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(framebuf_rect_obj, 6, 8, framebuf_rect);
 
+#if MICROPY_PY_FRAMEBUF_ALPHA
+static void line(const mp_obj_framebuf_t *fb, mp_int_t x1, mp_int_t y1, mp_int_t x2, mp_int_t y2, mp_int_t col, mp_int_t alpha, bool draw_last) {
+    // This implements Wu's antialiased line algorithm in 8-bit fixed-point.
+    // See https://en.wikipedia.org/wiki/Xiaolin_Wu%27s_line_algorithm
+
+    setpixel_checked(fb, x1, y1, col, 1, alpha);
+    if (x1 == x2 && y1 == y2) {
+        // nothing more to do
+        return;
+    }
+    if (draw_last) {
+        setpixel_checked(fb, x2, y2, col, 1, alpha);
+    }
+
+    mp_int_t dx = x2 - x1;
+    mp_int_t dy = y2 - y1;
+    if (dx + dy < 0) {
+        // swap ends
+        mp_int_t temp;
+        dx = -dx;
+        dy = -dy;
+        temp = x1;
+        x1 = x2;
+        x2 = temp;
+        temp = y1;
+        y1 = y2;
+        y2 = temp;
+    }
+
+    bool steep;
+    if (dy > dx || dy < -dx) {
+        // swap x and y
+        mp_int_t temp;
+        temp = x1;
+        x1 = y1;
+        y1 = temp;
+        temp = dx;
+        dx = dy;
+        dy = temp;
+        steep = true;
+    } else {
+        steep = false;
+    }
+
+    // Fixed point with 8 bits of fractional part.
+    // dx != 0 is guaranteed
+    mp_int_t gradient = ((dy * 256) / dx);
+
+    mp_int_t y_intercept = (y1 * 256) + gradient;
+    if (steep) {
+        for (mp_int_t x = x1 + 1; x < x1 + dx; ++x) {
+            setpixel_checked(fb, y_intercept >> 8, x, col, 1, (alpha * (0x100 - (y_intercept & 0xff))) >> 8);
+            setpixel_checked(fb, (y_intercept >> 8) + 1, x, col, 1, (alpha * (y_intercept & 0xff)) >> 8);
+            y_intercept += gradient;
+        }
+    } else {
+        for (mp_int_t x = x1 + 1; x < x1 + dx; ++x) {
+            setpixel_checked(fb, x, y_intercept >> 8, col, 1, (alpha * (0x100 - (y_intercept & 0xff))) >> 8);
+            setpixel_checked(fb, x, (y_intercept >> 8) + 1, col, 1, (alpha * (y_intercept & 0xff)) >> 8);
+            y_intercept += gradient;
+        }
+    }
+}
+#else // MICROPY_PY_FRAMEBUF_ALPHA
+static void line(const mp_obj_framebuf_t *fb, mp_int_t x1, mp_int_t y1, mp_int_t x2, mp_int_t y2, mp_int_t col, mp_int_t alpha, bool draw_last) {
+    // This implements Bresenham's line algorithm, see https://en.wikipedia.org/wiki/Bresenham%27s_line_algorithm
+    if (alpha <= 0) {
+        // nothing to do
+        return;
+    }
+    mp_int_t dx = x2 - x1;
+    mp_int_t sx;
+    if (dx > 0) {
+        sx = 1;
+    } else {
+        dx = -dx;
+        sx = -1;
+    }
+
+    mp_int_t dy = y2 - y1;
+    mp_int_t sy;
+    if (dy > 0) {
+        sy = 1;
+    } else {
+        dy = -dy;
+        sy = -1;
+    }
+
+    bool steep;
+    if (dy > dx) {
+        mp_int_t temp;
+        temp = x1;
+        x1 = y1;
+        y1 = temp;
+        temp = dx;
+        dx = dy;
+        dy = temp;
+        temp = sx;
+        sx = sy;
+        sy = temp;
+        steep = true;
+    } else {
+        steep = false;
+    }
+
+    mp_int_t e = 2 * dy - dx;
+    for (mp_int_t i = 0; i < dx; ++i) {
+        if (steep) {
+            if (0 <= y1 && y1 < fb->width && 0 <= x1 && x1 < fb->height) {
+                setpixel(fb, y1, x1, col, alpha);
+            }
+        } else {
+            if (0 <= x1 && x1 < fb->width && 0 <= y1 && y1 < fb->height) {
+                setpixel(fb, x1, y1, col, alpha);
+            }
+        }
+        while (e >= 0) {
+            y1 += sy;
+            e -= 2 * dx;
+        }
+        x1 += sx;
+        e += 2 * dy;
+    }
+
+    if (draw_last) {
+        setpixel_checked(fb, x2, y2, col, 1, alpha);
+    }
+}
+#endif // MICROPY_PY_FRAMEBUF_ALPHA
+
 static mp_obj_t framebuf_line(size_t n_args, const mp_obj_t *args_in) {
     (void)n_args;
 
@@ -655,6 +659,7 @@ static MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(framebuf_line_obj, 6, 7, framebuf_lin
 #define ELLIPSE_MASK_Q4 (0x08)
 
 static void draw_ellipse_points(const mp_obj_framebuf_t *fb, mp_int_t cx, mp_int_t cy, mp_int_t x, mp_int_t y, mp_int_t col, mp_int_t mask, mp_int_t alpha) {
+    // Care needs to be taken to avoid drawing the same pixel twice when using transparency.
     if (mask & ELLIPSE_MASK_FILL) {
         if (y == 0 && (mask & ELLIPSE_MASK_ALL)) {
             // on y-axis, draw one hline
@@ -1210,13 +1215,12 @@ static mp_obj_t framebuf_blit(size_t n_args, const mp_obj_t *args_in) {
     int x0end = MIN(self->width, x + source.width);
     int y0end = MIN(self->height, y + source.height);
 
-    mp_int_t alpha = 0x100;
-    #if MICROPY_PY_FRAMEBUF_ALPHA
+    mp_int_t alpha = 0xFF;
     mp_int_t alpha_mul = 0;
     mp_obj_framebuf_t mask;
     if (n_args > 6 && args_in[6] != mp_const_none) {
         if (mp_obj_get_type(args_in[6]) == &mp_type_int) {
-            alpha = mp_obj_get_int(args_in[6]);
+            alpha = FRAMEBUF_GET_ALPHA_ARG(6);
             if (alpha <= 0) {
                 // nothing to do
                 return mp_const_none;
@@ -1231,8 +1235,9 @@ static mp_obj_t framebuf_blit(size_t n_args, const mp_obj_t *args_in) {
                 case FRAMEBUF_MVLSB:
                 case FRAMEBUF_MHLSB:
                 case FRAMEBUF_MHMSB:
-                    alpha_mul = 0x100;
+                    alpha_mul = 0xFF;
                     break;
+                #if MICROPY_PY_FRAMEBUF_ALPHA
                 case FRAMEBUF_GS8:
                     alpha_mul = 1;
                     break;
@@ -1242,13 +1247,13 @@ static mp_obj_t framebuf_blit(size_t n_args, const mp_obj_t *args_in) {
                 case FRAMEBUF_GS2_HMSB:
                     alpha_mul = 0x1111;
                     break;
+                #endif // MICROPY_PY_FRAMEBUF_ALPHA
                 default:
                     // other formats can't easily be converted to alpha
                     mp_raise_ValueError(MP_ERROR_TEXT("invalid mask format"));
             }
         }
     }
-    #endif // MICROPY_PY_FRAMEBUF_ALPHA
 
     for (; y0 < y0end; ++y0) {
         int cx1 = x1;
@@ -1257,12 +1262,10 @@ static mp_obj_t framebuf_blit(size_t n_args, const mp_obj_t *args_in) {
             if (palette.buf) {
                 col = getpixel(&palette, col, 0);
             }
-            #if MICROPY_PY_FRAMEBUF_ALPHA
             if (alpha_mul) {
                 alpha = getpixel(&mask, cx1, y1) * alpha_mul;
             }
-            #endif // MICROPY_PY_FRAMEBUF_ALPHA
-            if (col != (uint32_t)key) {
+            if (col != (uint32_t)key && (alpha > 0)) {
                 setpixel(self, cx0, y0, col, alpha);
             }
             ++cx1;
@@ -1311,7 +1314,7 @@ static mp_obj_t framebuf_scroll(mp_obj_t self_in, mp_obj_t xstep_in, mp_obj_t ys
     }
     for (; y != yend; y += dy) {
         for (unsigned x = sx; x != xend; x += dx) {
-            setpixel(self, x, y, getpixel(self, x - xstep, y - ystep), 0x100);
+            setpixel(self, x, y, getpixel(self, x - xstep, y - ystep), 0xFF);
         }
     }
     return mp_const_none;
