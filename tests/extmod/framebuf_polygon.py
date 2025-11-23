@@ -12,7 +12,7 @@ if not hasattr(framebuf.FrameBuffer, "poly"):
     raise SystemExit
 
 if framebuf.ALPHA:
-    # Test non-antialiased version
+    # This tests non-alpha version
     print("SKIP")
     raise SystemExit
 

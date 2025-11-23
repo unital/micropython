@@ -5,14 +5,13 @@ except ImportError:
     print("SKIP")
     raise SystemExit
 
-
 # TODO: poly needs functions that aren't in dynruntime.h yet.
 if not hasattr(framebuf.FrameBuffer, "poly"):
     print("SKIP")
     raise SystemExit
 
 if not framebuf.ALPHA:
-    # Testing for anti-aliased lines
+    # Testing for alpha and antialiased drawing
     print("SKIP")
     raise SystemExit
 

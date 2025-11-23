@@ -285,7 +285,29 @@ static void setpixel(const mp_obj_framebuf_t *fb, mp_int_t x, mp_int_t y, uint32
     }
     formats[fb->format].setpixel(fb, x, y, col);
 }
+#else // MICROPY_PY_FRAMEBUF_ALPHA
 
+#ifndef FRAMEBUF_GET_ALPHA_ARG
+#define FRAMEBUF_GET_ALPHA_ARG(idx) (0xFF)
+#endif // GET_ALPHA_ARG
+
+static inline void setpixel(const mp_obj_framebuf_t *fb, unsigned int x, unsigned int y, uint32_t col, mp_int_t alpha) {
+    (void)alpha;
+    formats[fb->format].setpixel(fb, x, y, col);
+}
+#endif // MICROPY_PY_FRAMEBUF_ALPHA
+
+static void setpixel_checked(const mp_obj_framebuf_t *fb, mp_int_t x, mp_int_t y, mp_int_t col, mp_int_t mask, mp_int_t alpha) {
+    if (mask && alpha > 0 && 0 <= x && x < fb->width && 0 <= y && y < fb->height) {
+        setpixel(fb, x, y, col, alpha);
+    }
+}
+
+static inline uint32_t getpixel(const mp_obj_framebuf_t *fb, unsigned int x, unsigned int y) {
+    return formats[fb->format].getpixel(fb, x, y);
+}
+
+#if MICROPY_PY_FRAMEBUF_ALPHA
 static void fill_rect(const mp_obj_framebuf_t *fb, int x, int y, int w, int h, uint32_t col, mp_int_t alpha) {
     if (alpha == 0 || h < 1 || w < 1 || x + w <= 0 || y + h <= 0 || y >= fb->height || x >= fb->width) {
         // No operation needed.
@@ -308,19 +330,10 @@ static void fill_rect(const mp_obj_framebuf_t *fb, int x, int y, int w, int h, u
         }
     }
 }
-
-
 #else // MICROPY_PY_FRAMEBUF_ALPHA
-
-#ifndef FRAMEBUF_GET_ALPHA_ARG
-#define FRAMEBUF_GET_ALPHA_ARG(idx) (0xFF)
-#endif // GET_ALPHA_ARG
-
-static inline void setpixel(const mp_obj_framebuf_t *fb, unsigned int x, unsigned int y, uint32_t col, mp_int_t alpha) {
-    formats[fb->format].setpixel(fb, x, y, col);
-}
-
 static void fill_rect(const mp_obj_framebuf_t *fb, int x, int y, int w, int h, uint32_t col, mp_int_t alpha) {
+    (void)alpha;
+
     if (h < 1 || w < 1 || x + w <= 0 || y + h <= 0 || y >= fb->height || x >= fb->width) {
         // No operation needed.
         return;
@@ -334,18 +347,7 @@ static void fill_rect(const mp_obj_framebuf_t *fb, int x, int y, int w, int h, u
 
     formats[fb->format].fill_rect(fb, x, y, xend - x, yend - y, col);
 }
-
 #endif // MICROPY_PY_FRAMEBUF_ALPHA
-
-static void setpixel_checked(const mp_obj_framebuf_t *fb, mp_int_t x, mp_int_t y, mp_int_t col, mp_int_t mask, mp_int_t alpha) {
-    if (mask && alpha > 0 && 0 <= x && x < fb->width && 0 <= y && y < fb->height) {
-        setpixel(fb, x, y, col, alpha);
-    }
-}
-
-static inline uint32_t getpixel(const mp_obj_framebuf_t *fb, unsigned int x, unsigned int y) {
-    return formats[fb->format].getpixel(fb, x, y);
-}
 
 static mp_obj_t framebuf_make_new_helper(size_t n_args, const mp_obj_t *args_in, unsigned int buf_flags, mp_obj_framebuf_t *o) {
 
@@ -572,10 +574,9 @@ static void line(const mp_obj_framebuf_t *fb, mp_int_t x1, mp_int_t y1, mp_int_t
 #else // MICROPY_PY_FRAMEBUF_ALPHA
 static void line(const mp_obj_framebuf_t *fb, mp_int_t x1, mp_int_t y1, mp_int_t x2, mp_int_t y2, mp_int_t col, mp_int_t alpha, bool draw_last) {
     // This implements Bresenham's line algorithm, see https://en.wikipedia.org/wiki/Bresenham%27s_line_algorithm
-    if (alpha <= 0) {
-        // nothing to do
-        return;
-    }
+    (void)alpha;
+    (void)draw_last;
+
     mp_int_t dx = x2 - x1;
     mp_int_t sx;
     if (dx > 0) {
@@ -630,9 +631,7 @@ static void line(const mp_obj_framebuf_t *fb, mp_int_t x1, mp_int_t y1, mp_int_t
         e += 2 * dy;
     }
 
-    if (draw_last) {
-        setpixel_checked(fb, x2, y2, col, 1, alpha);
-    }
+    setpixel_checked(fb, x2, y2, col, 1, alpha);
 }
 #endif // MICROPY_PY_FRAMEBUF_ALPHA
 
@@ -1059,10 +1058,6 @@ static mp_obj_t framebuf_poly(size_t n_args, const mp_obj_t *args_in) {
     mp_int_t col = mp_obj_get_int(args_in[4]);
     bool fill = n_args > 5 && mp_obj_is_true(args_in[5]);
     mp_int_t alpha = FRAMEBUF_GET_ALPHA_ARG(6);
-    if (alpha <= 0) {
-        // nothing to do
-        return mp_const_none;
-    }
 
     if (fill) {
         // This implements an integer version of http://alienryderflex.com/polygon_fill/
@@ -1185,17 +1180,6 @@ static mp_obj_t framebuf_blit(size_t n_args, const mp_obj_t *args_in) {
 
     mp_int_t x = mp_obj_get_int(args_in[2]);
     mp_int_t y = mp_obj_get_int(args_in[3]);
-
-    if (
-        (x >= self->width) ||
-        (y >= self->height) ||
-        (-x >= source.width) ||
-        (-y >= source.height)
-        ) {
-        // Out of bounds, no-op, leave early.
-        return mp_const_none;
-    }
-
     // Key and palette argument handling.
     mp_int_t key = -1;
     if (n_args > 4) {
@@ -1205,6 +1189,16 @@ static mp_obj_t framebuf_blit(size_t n_args, const mp_obj_t *args_in) {
     palette.buf = NULL;
     if (n_args > 5 && args_in[5] != mp_const_none) {
         get_readonly_framebuffer(args_in[5], &palette);
+    }
+
+    if (
+        (x >= self->width) ||
+        (y >= self->height) ||
+        (-x >= source.width) ||
+        (-y >= source.height)
+        ) {
+        // Out of bounds, no-op.
+        return mp_const_none;
     }
 
     // Clip.

@@ -4,7 +4,6 @@ except ImportError:
     print("SKIP")
     raise SystemExit
 
-
 w = 5
 h = 16
 size = ((w + 7) & ~7) * ((h + 7) & ~7) // 8
