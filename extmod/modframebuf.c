@@ -784,7 +784,7 @@ typedef struct edge {
     mp_int_t slope;
 } edge;
 
-static void insert_edge(edge* edge_table, int n_edges, mp_int_t py1, mp_int_t py2, mp_int_t px1, mp_int_t slope) {
+static void insert_edge(edge *edge_table, int n_edges, mp_int_t py1, mp_int_t py2, mp_int_t px1, mp_int_t slope) {
     edge e = {
         py1,
         py2,
@@ -808,7 +808,7 @@ typedef struct node {
     uint32_t mask;
 } node;
 
-static int insert_node(node* node_table, int n_nodes, mp_int_t x, uint32_t mask) {
+static int insert_node(node *node_table, int n_nodes, mp_int_t x, uint32_t mask) {
     node n = {x, mask};
     node current;
     // simple linear ordered insertion
@@ -948,7 +948,7 @@ static mp_obj_t framebuf_poly(size_t n_args, const mp_obj_t *args_in) {
                 mp_int_t y1 = (line == 0) ? ((row << 2) - 1) : ((row << 2) + 1);
                 for (int i = 0; i < last_edge_index; ++i) {
                     // For each edge...
-                    edge* e = &(edge_table[i]);
+                    edge *e = &(edge_table[i]);
                     if ((e->y2 * 4) < y1) {
                         // Edge below subsample line.
                         continue;
@@ -1006,7 +1006,7 @@ static mp_obj_t framebuf_poly(size_t n_args, const mp_obj_t *args_in) {
                     // fill with run of pixels with same mask - can be fast
                     mp_int_t width;
                     if (i + 1 < n_nodes) {
-                        width = nodes[i+1].x - current.x - 1;
+                        width = nodes[i + 1].x - current.x - 1;
                     } else {
                         width = self->width - current.x - 1;
                     }
