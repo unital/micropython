@@ -248,11 +248,12 @@ Constants
 
     If this is False, all alpha parameters will be ignored, lines and
     polygons will be rendered with non-anti-aliasing algorithms, and drawing
-    will be done full opaquely. In the blit method a monochrome buffer can be
-    used as the *alpha* parameter to provide a binary mask (0 is transparent,
-    1 is opaque), but other values are ignored or are errors.
+    will be done full opaquely. In the ``framebuf.blit`` method a monochrome
+    buffer can be used as the *alpha* parameter to provide a binary mask (0
+    is transparent, 1 is opaque), but other values are ignored or are errors.
 
-    If this is True, alpha parameters will be used and anti-aliased algorithms
-    will be used for rendering lines and polygons.
+    If this is True, alpha parameters will act as specified in the descriptions,
+    anti-aliased algorithms will be used for rendering lines and polygons, and
+    ``framebuf.blit`` can use grayscale masks.
 
     There is currently no support for rendering antialiased ellipses.
