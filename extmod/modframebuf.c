@@ -389,9 +389,9 @@ static void line(const mp_obj_framebuf_t *fb, mp_int_t x1, mp_int_t y1, mp_int_t
 
     // Fixed point with 8 bits of fractional part.
     // dx != 0 is guaranteed
-    mp_int_t gradient = ((dy << 8) / dx);
+    mp_int_t gradient = ((dy * 256) / dx);
 
-    mp_int_t y_intercept = (y1 << 8) + gradient;
+    mp_int_t y_intercept = (y1 * 256) + gradient;
     if (steep) {
         for (mp_int_t x = x1 + 1; x < x1 + dx; ++x) {
             setpixel_checked(fb, y_intercept >> 8, x, col, 1, (alpha * (0x100 - (y_intercept & 0xff))) >> 8);
@@ -908,20 +908,24 @@ static mp_obj_t framebuf_poly(size_t n_args, const mp_obj_t *args_in) {
                 // going up
                 if (py1 <= self->height || py2 >= 0) {
                     // intersects buffer vertically
-                    insert_edge(edge_table, n_edges, py1, py2, px1 << 12, ((px2 - px1) << 12) / (py2 - py1));
+                    insert_edge(edge_table, n_edges, py1, py2, px1 * (1 << 12), ((px2 - px1) * (1 << 12)) / (py2 - py1));
                     ++n_edges;
                 }
             } else if (py1 > py2) {
                 // going down
                 if (py2 <= self->height || py1 >= 0) {
                     // intersects buffer vertically
-                    insert_edge(edge_table, n_edges, py2, py1, px2 << 12, ((px2 - px1) << 12) / (py2 - py1));
+                    insert_edge(edge_table, n_edges, py2, py1, px2 * (1 << 12), ((px2 - px1) * (1 << 12)) / (py2 - py1));
                     ++n_edges;
                 }
             } // ... and ignore horizontal edges
 
             px1 = px2;
             py1 = py2;
+        }
+        if (n_edges == 0) {
+            // No non-horizontal edges: nothing to draw.
+            return mp_const_none;
         }
         y_start = MAX(0, y_start);
         y_end = MIN(self->height, y_end);
@@ -938,17 +942,17 @@ static mp_obj_t framebuf_poly(size_t n_args, const mp_obj_t *args_in) {
             int n_nodes = 0;
             node nodes[2 * last_edge_index];
 
-            for (mp_int_t line = 0; line < 2; ++line) {
+            for (int line = 0; line < 2; ++line) {
                 // For each subsample line...
                 // Get y-value with 2 bits of fixed precision
                 mp_int_t y1 = (line == 0) ? ((row << 2) - 1) : ((row << 2) + 1);
                 for (int i = 0; i < last_edge_index; ++i) {
                     // For each edge...
                     edge* e = &(edge_table[i]);
-                    if ((e->y2 << 2) < y1) {
+                    if ((e->y2 * 4) < y1) {
                         // Edge below subsample line.
                         continue;
-                    } else if ((e->y1 << 2) > y1) {
+                    } else if ((e->y1 * 4) > y1) {
                         // Edge above subsample line (can happen for lower subsample line at start of edge).
                         continue;
                     }
@@ -964,7 +968,7 @@ static mp_obj_t framebuf_poly(size_t n_args, const mp_obj_t *args_in) {
                         e->x1 += (e->slope >> 1);
                         continue;
                     }
-                    mp_int_t subpixel_offset = (x_adjusted - (column << 12)) >> 10;
+                    mp_int_t subpixel_offset = (x_adjusted - (column * (1 << 12))) >> 10;
 
                     // Compute mask for subpixel scanline.
                     uint32_t mask = ((1 << (4 - subpixel_offset)) - 1) << (line << 2);
