@@ -241,7 +241,6 @@ static mp_framebuf_p_t formats[] = {
     [FRAMEBUF_MHMSB] = {mono_horiz_setpixel, mono_horiz_getpixel, mono_horiz_fill_rect},
 };
 
-
 #if MICROPY_PY_FRAMEBUF_ALPHA
 
 #ifndef FRAMEBUF_GET_ALPHA_ARG
@@ -574,7 +573,6 @@ static void line(const mp_obj_framebuf_t *fb, mp_int_t x1, mp_int_t y1, mp_int_t
 #else // MICROPY_PY_FRAMEBUF_ALPHA
 static void line(const mp_obj_framebuf_t *fb, mp_int_t x1, mp_int_t y1, mp_int_t x2, mp_int_t y2, mp_int_t col, mp_int_t alpha, bool draw_last) {
     // This implements Bresenham's line algorithm, see https://en.wikipedia.org/wiki/Bresenham%27s_line_algorithm
-    (void)alpha;
     (void)draw_last;
 
     mp_int_t dx = x2 - x1;
