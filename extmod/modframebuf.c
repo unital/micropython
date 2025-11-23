@@ -310,7 +310,8 @@ static void fill_rect(const mp_obj_framebuf_t *fb, int x, int y, int w, int h, u
 }
 
 
-#else
+#else // MICROPY_PY_FRAMEBUF_ALPHA
+
 #ifndef FRAMEBUF_GET_ALPHA_ARG
 #define FRAMEBUF_GET_ALPHA_ARG(idx) (0x100)
 #endif // GET_ALPHA_ARG
@@ -406,7 +407,7 @@ static void line(const mp_obj_framebuf_t *fb, mp_int_t x1, mp_int_t y1, mp_int_t
         }
     }
 }
-#else
+#else // MICROPY_PY_FRAMEBUF_ALPHA
 static void line(const mp_obj_framebuf_t *fb, mp_int_t x1, mp_int_t y1, mp_int_t x2, mp_int_t y2, mp_int_t col, mp_int_t alpha, bool draw_last) {
     if (alpha <= 0) {
         // nothing to do
@@ -1034,7 +1035,7 @@ static mp_obj_t framebuf_poly(size_t n_args, const mp_obj_t *args_in) {
 
     return mp_const_none;
 }
-#else
+#else // MICROPY_PY_FRAMEBUF_ALPHA
 static mp_obj_t framebuf_poly(size_t n_args, const mp_obj_t *args_in) {
     mp_obj_framebuf_t *self = MP_OBJ_TO_PTR(args_in[0]);
 
