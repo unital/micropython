@@ -13,17 +13,6 @@ void *memset(void *s, int c, size_t n) {
 }
 #endif
 
-#if __has_builtin(__builtin_popcount)
-#define mp_popcount(x) __builtin_popcount(x)
-#else
-static inline uint32_t mp_popcount(uint32_t x) {
-    x = x - ((x >> 1) & 0x55555555);
-    x = (x & 0x33333333) + ((x >> 2) & 0x33333333);
-    x = (x + (x >> 4)) & 0x0F0F0F0F;
-    return (x * 0x01010101) >> 24;
-}
-#endif // __has_builtin(__builtin_popcount)
-
 mp_obj_full_type_t mp_type_framebuf;
 
 #include "extmod/modframebuf.c"

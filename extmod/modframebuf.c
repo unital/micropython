@@ -29,7 +29,6 @@
 
 #include "py/runtime.h"
 #include "py/binary.h"
-#include "py/misc.h"
 
 #if MICROPY_PY_FRAMEBUF
 
@@ -771,6 +770,13 @@ static mp_int_t poly_int(mp_buffer_info_t *bufinfo, size_t index) {
 
 #if MICROPY_PY_FRAMEBUF_ALPHA
 
+static inline uint32_t popcount(uint32_t x) {
+    x = x - ((x >> 1) & 0x55555555);
+    x = (x & 0x33333333) + ((x >> 2) & 0x33333333);
+    x = (x + (x >> 4)) & 0x0F0F0F0F;
+    return (x * 0x01010101) >> 24;
+}
+
 typedef struct edge {
     mp_int_t y1;
     mp_int_t y2;
@@ -986,7 +992,7 @@ static mp_obj_t framebuf_poly(size_t n_args, const mp_obj_t *args_in) {
 
                 if (current.x >= 0) {
                     // pixel is inside the buffer, so draw the pixel
-                    setpixel(self, current.x, row, col, (mp_popcount(mask) * alpha) >> 3);
+                    setpixel(self, current.x, row, col, (popcount(mask) * alpha) >> 3);
                 }
 
                 // extend mask by last bits
@@ -1000,7 +1006,7 @@ static mp_obj_t framebuf_poly(size_t n_args, const mp_obj_t *args_in) {
                     } else {
                         width = self->width - current.x - 1;
                     }
-                    fill_rect(self, current.x + 1, row, width, 1, col, (mp_popcount(mask) * alpha) >> 3);
+                    fill_rect(self, current.x + 1, row, width, 1, col, (popcount(mask) * alpha) >> 3);
                 }
             }
         }
