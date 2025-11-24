@@ -294,19 +294,23 @@ static void setpixel(const mp_obj_framebuf_t *fb, mp_int_t x, mp_int_t y, uint32
         return;
     } else if (alpha < 0xff) {
         uint16_t pix_col = formats[fb->format].getpixel(fb, x, y);
-        if (fb->format == FRAMEBUF_RGB565) {
-            uint16_t col16 = col;
-            urgb565 pix_col_struct = *(urgb565 *)&pix_col;
-            urgb565 col_struct = *(urgb565 *)&col16;
-            col_struct.rgb.r = alpha_blend(pix_col_struct.rgb.r, col_struct.rgb.r, alpha);
-            col_struct.rgb.g = alpha_blend(pix_col_struct.rgb.g, col_struct.rgb.g, alpha);
-            col_struct.rgb.b = alpha_blend(pix_col_struct.rgb.b, col_struct.rgb.b, alpha);
-            col_struct.rgb.r = MIN(col_struct.rgb.r, 0b11111);
-            col_struct.rgb.g = MIN(col_struct.rgb.g, 0b111111);
-            col_struct.rgb.b = MIN(col_struct.rgb.b, 0b11111);
-            col = *(uint16_t *)&col_struct;
-        } else {
-            col = alpha_blend(pix_col, col, alpha);
+        // for RGB565
+        uint16_t col16 = col & 0xFFFF;
+        urgb565 pix_col_struct = *(urgb565 *)&pix_col;
+        urgb565 col_struct = *(urgb565 *)&col16;
+        switch (fb->format) {
+            case FRAMEBUF_RGB565:
+            case FRAMEBUF_RGB565_BS:
+                col_struct.rgb.r = alpha_blend(pix_col_struct.rgb.r, col_struct.rgb.r, alpha);
+                col_struct.rgb.g = alpha_blend(pix_col_struct.rgb.g, col_struct.rgb.g, alpha);
+                col_struct.rgb.b = alpha_blend(pix_col_struct.rgb.b, col_struct.rgb.b, alpha);
+                col_struct.rgb.r = MIN(col_struct.rgb.r, 0b11111);
+                col_struct.rgb.g = MIN(col_struct.rgb.g, 0b111111);
+                col_struct.rgb.b = MIN(col_struct.rgb.b, 0b11111);
+                col = *(uint16_t *)&col_struct;
+                break;
+            default:
+                col = alpha_blend(pix_col, col, alpha);
         }
     }
     formats[fb->format].setpixel(fb, x, y, col);
