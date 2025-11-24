@@ -257,8 +257,17 @@ typedef union {
     rgb565 rgb;
 } urgb565;
 
+static uint32_t alpha_mult(uint32_t c, uint32_t alpha) {
+    // Efficient, correct alpha multiplication following Van Aken.
+    // See https://arxiv.org/pdf/2202.02864
+    c *= alpha;
+    c += 0x80U;
+    c += c >> 8;
+    return c >> 8;
+}
+
 static uint32_t alpha_blend(uint32_t c1, uint32_t c2, uint32_t alpha) {
-    return (c1 * (0xff - alpha) + alpha * c2 + 0x80) >> 8;
+    return alpha_mult(c1, 0xff - alpha) + alpha_mult(c2, alpha);
 }
 
 static void setpixel(const mp_obj_framebuf_t *fb, mp_int_t x, mp_int_t y, uint32_t col, mp_int_t alpha) {
@@ -551,21 +560,21 @@ static void line(const mp_obj_framebuf_t *fb, mp_int_t x1, mp_int_t y1, mp_int_t
         steep = false;
     }
 
-    // Fixed point with 8 bits of fractional part.
+    // Fixed point with 12 bits of fractional part.
     // dx != 0 is guaranteed
-    mp_int_t gradient = ((dy * 256) / dx);
+    mp_int_t gradient = ((dy * (1 << 12)) / dx);
 
-    mp_int_t y_intercept = (y1 * 256) + gradient;
+    mp_int_t y_intercept = (y1 * (1 << 12)) + gradient;
     if (steep) {
         for (mp_int_t x = x1 + 1; x < x1 + dx; ++x) {
-            setpixel_checked(fb, y_intercept >> 8, x, col, 1, (alpha * (0x100 - (y_intercept & 0xff))) >> 8);
-            setpixel_checked(fb, (y_intercept >> 8) + 1, x, col, 1, (alpha * (y_intercept & 0xff)) >> 8);
+            setpixel_checked(fb, y_intercept >> 12, x, col, 1, alpha_mult(0xFF - ((y_intercept >> 4) & 0xff), alpha));
+            setpixel_checked(fb, (y_intercept >> 12) + 1, x, col, 1, alpha_mult((y_intercept >> 4) & 0xff, alpha));
             y_intercept += gradient;
         }
     } else {
         for (mp_int_t x = x1 + 1; x < x1 + dx; ++x) {
-            setpixel_checked(fb, x, y_intercept >> 8, col, 1, (alpha * (0x100 - (y_intercept & 0xff))) >> 8);
-            setpixel_checked(fb, x, (y_intercept >> 8) + 1, col, 1, (alpha * (y_intercept & 0xff)) >> 8);
+            setpixel_checked(fb, x, y_intercept >> 12, col, 1, alpha_mult(0xFF - ((y_intercept >> 4) & 0xff), alpha));
+            setpixel_checked(fb, x, (y_intercept >> 12) + 1, col, 1, alpha_mult((y_intercept >> 4) & 0xff, alpha));
             y_intercept += gradient;
         }
     }
@@ -884,8 +893,8 @@ static mp_obj_t framebuf_poly(size_t n_args, const mp_obj_t *args_in) {
         // The value of 1/slope is stored with 12 bits of fixed precision.
         // Horizontal lines are ignored.
 
+        // Increase alpha for mono buffers to get sharp corners.
         if (self->format == FRAMEBUF_MHLSB || self->format == FRAMEBUF_MHMSB || self->format == FRAMEBUF_MVLSB) {
-            // Increase alpha for mono to get sharp corners.
             alpha *= 2;
         }
 
@@ -952,10 +961,10 @@ static mp_obj_t framebuf_poly(size_t n_args, const mp_obj_t *args_in) {
                 for (int i = 0; i < last_edge_index; ++i) {
                     // For each edge...
                     edge *e = &(edge_table[i]);
-                    if ((e->y2 * 4) < y1) {
+                    if ((e->y2 * (1 << 2)) < y1) {
                         // Edge below subsample line.
                         continue;
-                    } else if ((e->y1 * 4) > y1) {
+                    } else if ((e->y1 * (1 << 2)) > y1) {
                         // Edge above subsample line (can happen for lower subsample line at start of edge).
                         continue;
                     }
@@ -964,7 +973,14 @@ static mp_obj_t framebuf_poly(size_t n_args, const mp_obj_t *args_in) {
                     // with subsample pixels round to nearest quarter.  This makes the antialiased values
                     // symmetric when given a symmetric shape.
                     mp_int_t x_adjusted = e->x1 + (1 << 11) + (1 << 9);
-                    mp_int_t column = x_adjusted >> 12;
+                    mp_int_t column;
+                    // We need integer floor division here, as remainder matters.
+                    if (x_adjusted > 0) {
+                        column = x_adjusted >> 12;
+                    } else {
+                        // avoid undefined behaviour of shifting negatives.
+                        column = ~((~x_adjusted) >> 12);
+                    }
                     if (column >= self->width) {
                         // Outside of buffer on the high end, don't care about these points,
                         // but need to bump the x-value in case line eventually comes inside the buffer.
@@ -999,7 +1015,7 @@ static mp_obj_t framebuf_poly(size_t n_args, const mp_obj_t *args_in) {
 
                 if (current.x >= 0) {
                     // pixel is inside the buffer, so draw the pixel
-                    setpixel(self, current.x, row, col, (popcount(mask) * alpha) >> 3);
+                    setpixel(self, current.x, row, col, alpha_mult((popcount(mask)*0b1001001) >> 1, alpha));
                 }
 
                 // extend mask by last bits
@@ -1013,7 +1029,7 @@ static mp_obj_t framebuf_poly(size_t n_args, const mp_obj_t *args_in) {
                     } else {
                         width = self->width - current.x - 1;
                     }
-                    fill_rect(self, current.x + 1, row, width, 1, col, (popcount(mask) * alpha) >> 3);
+                    fill_rect(self, current.x + 1, row, width, 1, col, alpha_mult((popcount(mask)*0b1001001) >> 1, alpha));
                 }
             }
         }
@@ -1227,17 +1243,17 @@ static mp_obj_t framebuf_blit(size_t n_args, const mp_obj_t *args_in) {
                 case FRAMEBUF_MVLSB:
                 case FRAMEBUF_MHLSB:
                 case FRAMEBUF_MHMSB:
-                    alpha_mul = 0xFF;
+                    alpha_mul = 0xff;
                     break;
                 #if MICROPY_PY_FRAMEBUF_ALPHA
                 case FRAMEBUF_GS8:
-                    alpha_mul = 1;
+                    alpha_mul = 0x1;
                     break;
                 case FRAMEBUF_GS4_HMSB:
-                    alpha_mul = 0x11;
+                    alpha_mul = 0x10001;
                     break;
                 case FRAMEBUF_GS2_HMSB:
-                    alpha_mul = 0x1111;
+                    alpha_mul = 0x01010101;
                     break;
                 #endif // MICROPY_PY_FRAMEBUF_ALPHA
                 default:
@@ -1255,9 +1271,13 @@ static mp_obj_t framebuf_blit(size_t n_args, const mp_obj_t *args_in) {
                 col = getpixel(&palette, col, 0);
             }
             if (alpha_mul) {
+                #if MICROPY_PY_FRAMEBUF_ALPHA
                 alpha = getpixel(&mask, cx1, y1) * alpha_mul;
+                #else // MICROPY_PY_FRAMEBUF_ALPHA
+                alpha = getpixel(&mask, cx1, y1);
+                #endif // MICROPY_PY_FRAMEBUF_ALPHA
             }
-            if (col != (uint32_t)key && (alpha > 0)) {
+            if (col != (uint32_t)key && alpha) {
                 setpixel(self, cx0, y0, col, alpha);
             }
             ++cx1;
