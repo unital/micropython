@@ -1015,7 +1015,7 @@ static mp_obj_t framebuf_poly(size_t n_args, const mp_obj_t *args_in) {
 
                 if (current.x >= 0) {
                     // pixel is inside the buffer, so draw the pixel
-                    setpixel(self, current.x, row, col, alpha_mult((popcount(mask)*0b1001001) >> 1, alpha));
+                    setpixel(self, current.x, row, col, alpha_mult((popcount(mask) * 0b1001001) >> 1, alpha));
                 }
 
                 // extend mask by last bits
@@ -1029,7 +1029,7 @@ static mp_obj_t framebuf_poly(size_t n_args, const mp_obj_t *args_in) {
                     } else {
                         width = self->width - current.x - 1;
                     }
-                    fill_rect(self, current.x + 1, row, width, 1, col, alpha_mult((popcount(mask)*0b1001001) >> 1, alpha));
+                    fill_rect(self, current.x + 1, row, width, 1, col, alpha_mult((popcount(mask) * 0b1001001) >> 1, alpha));
                 }
             }
         }
