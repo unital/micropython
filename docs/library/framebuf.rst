@@ -229,6 +229,15 @@ Constants
 
     Red Green Blue (16-bit, 5+6+5, native) color format in native byte-order.
 
+.. data:: framebuf.RGB565_BS
+
+    Red Green Blue (16-bit, 5+6+5, non-native) color format. This format uses
+    color values supplied with a non-native bit-pattern (ie. instead of
+    ``rrrrrggggggbbbbb`` the values are byte-swapped ``gggbbbbbrrrrrggg`` where
+    the least-significant bits of the green channel occur first). This is a
+    legacy format to ease migration for the common case of systems which used
+    displays with an opposite byte-order to microcontroller.
+
 .. data:: framebuf.RGB565_LE
 
     Red Green Blue (16-bit, 5+6+5, little-endian) color format in little-endian
@@ -270,3 +279,27 @@ Constants
     ``framebuf.blit`` can use grayscale masks.
 
     There is currently no support for rendering antialiased ellipses.
+
+.. note::
+    In Micropython 1.26 and earlier, the RGB565 format did not need
+    to know aout the internal color channels within each 16-bit value.
+    As a result, it did not care about the byte-order of the values stored
+    as pixels.  Many display devices use big-endian RGB565, and so code that
+    used them from little-endian microcontrollers would simply provide colors
+    as big-endian RGB565 values (ie. using ``0b00000000_11111000`` for red
+    instead of ``0b11111000_00000000``).
+
+    The introduction of support for alpha blending means that the RGB565 format
+    is assuming native byte-order for the layout of color channels within the
+    16-bits of a pixel.  This breaks code that uses byte-swapped color values,
+    but it can be adapted either by:
+
+    * using firmware compiled with alpha support disabled via the
+      ``MICROPY_PY_FRAMEBUF_ALPHA`` flag; or
+
+    * replacing the use of ``RGB565`` format with the byte-swapped
+      ``RGB565_BS`` format.
+
+    New code which needs to support buffers of a particular byte-order should
+    simply use ``RGB565_BE`` or ``RGB565_LE`` as appropriate, and supply colors
+    in native RGB565 format.
