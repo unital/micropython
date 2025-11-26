@@ -143,7 +143,7 @@ static void rgb565_fill_rect(const mp_obj_framebuf_t *fb, unsigned int x, unsign
     }
 }
 
-uint16_t bs16(uint16_t x) {
+static uint16_t bs16(uint16_t x) {
     return (x >> 8) | (x << 8);
 }
 
@@ -338,7 +338,8 @@ static void setpixel(const mp_obj_framebuf_t *fb, mp_int_t x, mp_int_t y, uint32
             case FRAMEBUF_RGB565_BS:
                 // The colors are specified in non-native endianness in Python.
                 // We need to byteswap to get native endianness.
-                col16 = bs16(col & 0xFFFF);
+                col16 = col & 0xFFFF;
+                col16 = bs16(col);
                 pix_col = bs16(pix_col);
                 pix_col_struct = *(urgb565 *)&pix_col;
                 col_struct = *(urgb565 *)&col16;
