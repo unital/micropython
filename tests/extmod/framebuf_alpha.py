@@ -198,3 +198,14 @@ printbuf()
 fbuf.fill(0)
 fbuf.ellipse(15, 15, 6, 12, 0xAA, True, 0b1111, 0x7F)
 printbuf()
+
+# Circle which might double-draw
+# Outline
+fbuf.fill(0)
+fbuf.ellipse(15, 15, 6, 6, 0x7F, False, 0b1111, 0x7F)
+printbuf()
+
+# Fill
+fbuf.fill(0)
+fbuf.ellipse(15, 15, 6, 6, 0xAA, True, 0b1111, 0x7F)
+printbuf()

@@ -607,7 +607,7 @@ static void line(const mp_obj_framebuf_t *fb, mp_int_t x1, mp_int_t y1, mp_int_t
     }
 
     bool steep;
-    if (dy > dx || dy < -dx) {
+    if (dy > dx) {
         // swap x and y
         mp_int_t temp;
         temp = x1;
@@ -791,8 +791,12 @@ static mp_obj_t framebuf_ellipse(size_t n_args, const mp_obj_t *args_in) {
     mp_int_t ellipse_error = 0;
     mp_int_t stoppingx = two_bsquare * args[2];
     mp_int_t stoppingy = 0;
+    mp_int_t last_drawn_x = -1;
+    mp_int_t last_drawn_y = -1;
     while (stoppingx >= stoppingy) {   // 1st set of points,  y' > -1
         draw_ellipse_points(self, args[0], args[1], x, y, args[4], mask, alpha);
+        last_drawn_x = x;
+        last_drawn_y = y;
         y += 1;
         stoppingy += two_asquare;
         ellipse_error += ychange;
@@ -813,7 +817,7 @@ static mp_obj_t framebuf_ellipse(size_t n_args, const mp_obj_t *args_in) {
     stoppingx = 0;
     stoppingy = two_asquare * args[3];
     while (stoppingx <= stoppingy) {  // 2nd set of points, y' < -1
-        if (!(mask & ELLIPSE_MASK_FILL)) {
+        if (!(mask & ELLIPSE_MASK_FILL) && (y != last_drawn_y || x != last_drawn_x)) {
             draw_ellipse_points(self, args[0], args[1], x, y, args[4], mask, alpha);
         }
         x += 1;
@@ -821,7 +825,7 @@ static mp_obj_t framebuf_ellipse(size_t n_args, const mp_obj_t *args_in) {
         ellipse_error += xchange;
         xchange += two_bsquare;
         if ((2 * ellipse_error + ychange) > 0) {
-            if (mask & ELLIPSE_MASK_FILL) {
+            if ((mask & ELLIPSE_MASK_FILL) && y != last_drawn_y) {
                 // moving to new scanline, draw line *once*
                 draw_ellipse_points(self, args[0], args[1], x - 1, y, args[4], mask, alpha);
             }
