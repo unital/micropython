@@ -262,13 +262,13 @@ static mp_framebuf_p_t formats[] = {
     [FRAMEBUF_MVLSB] = {mvlsb_setpixel, mvlsb_getpixel, mvlsb_fill_rect},
     [FRAMEBUF_RGB565] = {rgb565_setpixel, rgb565_getpixel, rgb565_fill_rect},
     [FRAMEBUF_RGB565_BS] = {rgb565_setpixel, rgb565_getpixel, rgb565_fill_rect},
-    #if MP_ENDIANNESS_BIG
+    #if MP_ENDIANNESS_LITTLE
+    [FRAMEBUF_RGB565_LE] = {rgb565_setpixel, rgb565_getpixel, rgb565_fill_rect},
+    [FRAMEBUF_RGB565_BE] = {rgb565_non_native_setpixel, rgb565_non_native_getpixel, rgb565_non_native_fill_rect},
+    #else // MP_ENDIANNESS_LITTLE
     [FRAMEBUF_RGB565_BE] = {rgb565_setpixel, rgb565_getpixel, rgb565_fill_rect},
     [FRAMEBUF_RGB565_LE] = {rgb565_non_native_setpixel, rgb565_non_native_getpixel, rgb565_non_native_fill_rect},
-    #else // MP_ENDIANNESS_BIG
-    [FRAMEBUF_RGB565_BE] = {rgb565_non_native_setpixel, rgb565_non_native_getpixel, rgb565_non_native_fill_rect},
-    [FRAMEBUF_RGB565_LE] = {rgb565_setpixel, rgb565_getpixel, rgb565_fill_rect},
-    #endif // MP_ENDIANNESS_BIG
+    #endif // MP_ENDIANNESS_LITTLE
     [FRAMEBUF_GS2_HMSB] = {gs2_hmsb_setpixel, gs2_hmsb_getpixel, gs2_hmsb_fill_rect},
     [FRAMEBUF_GS4_HMSB] = {gs4_hmsb_setpixel, gs4_hmsb_getpixel, gs4_hmsb_fill_rect},
     [FRAMEBUF_GS8] = {gs8_setpixel, gs8_getpixel, gs8_fill_rect},
@@ -317,6 +317,8 @@ static void setpixel(const mp_obj_framebuf_t *fb, mp_int_t x, mp_int_t y, uint32
         urgb565 col_struct = *(urgb565 *)&col16;
         switch (fb->format) {
             case FRAMEBUF_RGB565:
+            case FRAMEBUF_RGB565_BE:
+            case FRAMEBUF_RGB565_LE:
                 col16 = col & 0xFFFF;
                 pix_col_struct = *(urgb565 *)&pix_col;
                 col_struct = *(urgb565 *)&col16;
