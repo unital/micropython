@@ -143,19 +143,23 @@ static void rgb565_fill_rect(const mp_obj_framebuf_t *fb, unsigned int x, unsign
     }
 }
 
+uint16_t bs16(uint16_t x) {
+    return (x >> 8) | (x << 8);
+}
+
 static void rgb565_non_native_setpixel(const mp_obj_framebuf_t *fb, unsigned int x, unsigned int y, uint32_t col) {
     uint16_t col16 = col;
-    ((uint16_t *)fb->buf)[x + y * fb->stride] =  __builtin_bswap16(col16);
+    ((uint16_t *)fb->buf)[x + y * fb->stride] =  bs16(col16);
 }
 
 static uint32_t rgb565_non_native_getpixel(const mp_obj_framebuf_t *fb, unsigned int x, unsigned int y) {
-    uint32_t col = __builtin_bswap16(((uint16_t *)fb->buf)[x + y * fb->stride]);
+    uint32_t col = bs16(((uint16_t *)fb->buf)[x + y * fb->stride]);
     return col;
 }
 
 static void rgb565_non_native_fill_rect(const mp_obj_framebuf_t *fb, unsigned int x, unsigned int y, unsigned int w, unsigned int h, uint32_t col) {
     uint16_t col16 = col;
-    col16 = __builtin_bswap16(col16);
+    col16 = bs16(col16);
     uint16_t *b = &((uint16_t *)fb->buf)[x + y * fb->stride];
     while (h--) {
         for (unsigned int ww = w; ww; --ww) {
@@ -334,8 +338,8 @@ static void setpixel(const mp_obj_framebuf_t *fb, mp_int_t x, mp_int_t y, uint32
             case FRAMEBUF_RGB565_BS:
                 // The colors are specified in non-native endianness in Python.
                 // We need to byteswap to get native endianness.
-                col16 = __builtin_bswap16(col & 0xFFFF);
-                pix_col = __builtin_bswap16(pix_col);
+                col16 = bs16(col & 0xFFFF);
+                pix_col = bs16(pix_col);
                 pix_col_struct = *(urgb565 *)&pix_col;
                 col_struct = *(urgb565 *)&col16;
                 col_struct.rgb.r = alpha_blend(pix_col_struct.rgb.r, col_struct.rgb.r, alpha);
@@ -346,7 +350,7 @@ static void setpixel(const mp_obj_framebuf_t *fb, mp_int_t x, mp_int_t y, uint32
                 col_struct.rgb.b = MIN(col_struct.rgb.b, 0b11111);
                 col = *(uint16_t *)&col_struct;
                 // And byteswap back to get non-native endianness.
-                col = __builtin_bswap16(col);
+                col = bs16(col);
                 break;
             default:
                 col = alpha_blend(pix_col, col, alpha);
