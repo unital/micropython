@@ -515,9 +515,9 @@ static mp_obj_t framebuf_fill(mp_obj_t self_in, mp_obj_t col_in) {
     mp_obj_framebuf_t *self = MP_OBJ_TO_PTR(self_in);
     mp_int_t col = mp_obj_get_int(col_in);
     if (self->format == FRAMEBUF_RGB565_BE) {
-        printf("big fill\n");
-    } else if (self->format == FRAMEBUF_RGB565_BE) {
-        printf("little fill\n");
+        printf("big fill: %ld\n", col);
+    } else if (self->format == FRAMEBUF_RGB565_LE) {
+        printf("little fill: %ld\n", col);
     }
     formats[self->format].fill_rect(self, 0, 0, self->width, self->height, col);
     return mp_const_none;
