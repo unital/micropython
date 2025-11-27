@@ -148,7 +148,7 @@ static uint16_t bs16(uint16_t x) {
 }
 
 static void rgb565_non_native_setpixel(const mp_obj_framebuf_t *fb, unsigned int x, unsigned int y, uint32_t col) {
-    uint16_t col16 = col;
+    uint16_t col16 = col & 0xffff;
     ((uint16_t *)fb->buf)[x + y * fb->stride] =  bs16(col16);
 }
 
@@ -158,7 +158,7 @@ static uint32_t rgb565_non_native_getpixel(const mp_obj_framebuf_t *fb, unsigned
 }
 
 static void rgb565_non_native_fill_rect(const mp_obj_framebuf_t *fb, unsigned int x, unsigned int y, unsigned int w, unsigned int h, uint32_t col) {
-    uint16_t col16 = col;
+    uint16_t col16 = col & 0xffff;
     col16 = bs16(col16);
     uint16_t *b = &((uint16_t *)fb->buf)[x + y * fb->stride];
     while (h--) {

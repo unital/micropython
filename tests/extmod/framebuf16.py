@@ -60,3 +60,7 @@ for format in [framebuf.RGB565_LE, framebuf.RGB565_BE]:
     fbuf.blit(fbuf2, -1, -1, 0x0000)
     fbuf.blit(fbuf2, 16, 16, 0x0000)
     printbuf()
+
+    # check behavior of fill
+    fbuf.fill(0x00EE)
+    printbuf()
