@@ -320,7 +320,7 @@ static void setpixel(const mp_obj_framebuf_t *fb, mp_int_t x, mp_int_t y, uint32
                 // We need to byteswap to get native endianness.
                 col16 = __builtin_bswap16(col);
                 pix_col = __builtin_bswap16(pix_col);
-                // fall through to other RGB cases...
+            // fall through to other RGB cases...
             case FRAMEBUF_RGB565:
             case FRAMEBUF_RGB565_BE:
             case FRAMEBUF_RGB565_LE:
@@ -1329,11 +1329,7 @@ static mp_obj_t framebuf_blit(size_t n_args, const mp_obj_t *args_in) {
                 col = getpixel(&palette, col, 0);
             }
             if (alpha_mul) {
-                #if MICROPY_PY_FRAMEBUF_ALPHA
                 alpha = getpixel(&mask, cx1, y1) * alpha_mul;
-                #else // MICROPY_PY_FRAMEBUF_ALPHA
-                alpha = getpixel(&mask, cx1, y1);
-                #endif // MICROPY_PY_FRAMEBUF_ALPHA
             }
             if (col != (uint32_t)key && alpha) {
                 setpixel(self, cx0, y0, col, alpha);
