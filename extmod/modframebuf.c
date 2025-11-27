@@ -947,15 +947,15 @@ static mp_obj_t framebuf_poly(size_t n_args, const mp_obj_t *args_in) {
         // Explanation in the context of embedded systems: https://aykevl.nl/2024/02/tinygl-polygon/
         // We don't use a lookup table.
 
-        // Build a table of edges and data
-        // The table consists of entries (y_min, y_max, x_min, 1/slope) and is ordered by y_min.
-        // The value of 1/slope is stored with 12 bits of fixed precision.
-        // Horizontal lines are ignored.
-
         // Increase alpha for mono buffers to get sharp corners.
         if (self->format == FRAMEBUF_MHLSB || self->format == FRAMEBUF_MHMSB || self->format == FRAMEBUF_MVLSB) {
             alpha *= 2;
         }
+
+        // Build an ordered table of edges and data
+        // The table consists of entries (y_min, y_max, x_min, 1/slope) and is ordered by y_min.
+        // The value of 1/slope is stored with 12 bits of fixed precision.
+        // Horizontal lines are ignored.
 
         edge edge_table[n_poly];
         int n_edges = 0;
@@ -1001,7 +1001,7 @@ static mp_obj_t framebuf_poly(size_t n_args, const mp_obj_t *args_in) {
         y_start = MAX(0, y_start);
         y_end = MIN(self->height, y_end);
 
-        // Track edges which intersect scanlines.
+        // Track which edges are can possibly intersect subsample scanlines.
         int last_edge_index = 0;
 
         for (mp_int_t row = y_start; row < y_end; row++) {
@@ -1010,6 +1010,8 @@ static mp_obj_t framebuf_poly(size_t n_args, const mp_obj_t *args_in) {
                 ++last_edge_index;
             }
 
+            // Build an ordered table of intersection locations and masks on subsample scanlines.
+            // The table is ordered by pixel column and holds the mask for that pixel.
             int n_nodes = 0;
             node nodes[2 * last_edge_index];
 
@@ -1021,7 +1023,7 @@ static mp_obj_t framebuf_poly(size_t n_args, const mp_obj_t *args_in) {
                     // For each edge...
                     edge *e = &(edge_table[i]);
                     if ((e->y2 * (1 << 2)) < y1) {
-                        // Edge below subsample line.
+                        // Edge is below subsample line, ignore.
                         continue;
                     } else if ((e->y1 * (1 << 2)) > y1) {
                         // Edge above subsample line (can happen for lower subsample line at start of edge).
@@ -1041,7 +1043,7 @@ static mp_obj_t framebuf_poly(size_t n_args, const mp_obj_t *args_in) {
                         column = ~((~x_adjusted) >> 12);
                     }
                     if (column >= self->width) {
-                        // Outside of buffer on the high end, don't care about these points,
+                        // Outside of buffer width: don't care about these points for this row,
                         // but need to bump the x-value in case line eventually comes inside the buffer.
                         e->x1 += (e->slope >> 1);
                         continue;
@@ -1063,31 +1065,36 @@ static mp_obj_t framebuf_poly(size_t n_args, const mp_obj_t *args_in) {
                 continue;
             }
 
-            // Now draw the pixels.
+            // Now draw the pixels by running through the intersection nodes.
             uint32_t mask = 0;
             node current;
             for (int i = 0; i < n_nodes; ++i) {
                 current = nodes[i];
 
-                // Update the mask
+                // Update the mask.
                 mask ^= current.mask;
 
                 if (current.x >= 0) {
-                    // pixel is inside the buffer, so draw the pixel
+                    // The pixel is inside the buffer, so draw the pixel.
+                    // The alpha of pixel is scaled by the number of bits in the mask (0-8, inclusive),
+                    // So we multiply popcount by 255/9 with one bit of fixed point precision.
                     setpixel(self, current.x, row, col, alpha_mult((popcount(mask) * 0b1001001) >> 1, alpha));
                 }
 
-                // extend mask by last bits
+                // Extend mask by last bits of each subscanline.
                 mask = (mask & 0b00010001) * 0b1111;
 
                 if (mask) {
-                    // fill with run of pixels with same mask - can be fast
+                    // Fill with a run of pixels with same mask - can be fast.
+                    // Width is either distance to next node, or to width of buffer if no more nodes.
                     mp_int_t width;
                     if (i + 1 < n_nodes) {
                         width = nodes[i + 1].x - current.x - 1;
                     } else {
                         width = self->width - current.x - 1;
                     }
+                    // Use fill_rect as it accounts for rectangles wider than buffer.
+                    // See above for discussion of alpha computation.
                     fill_rect(self, current.x + 1, row, width, 1, col, alpha_mult((popcount(mask) * 0b1001001) >> 1, alpha));
                 }
             }
