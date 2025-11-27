@@ -32,7 +32,7 @@ for format in [framebuf.RGB565_LE, framebuf.RGB565_BE]:
     printbuf()
 
     # get pixel
-    print(fbuf.pixel(0, 4), fbuf.pixel(1, 1))
+    print(fbuf.pixel(0, 4), fbuf.pixel(1, 1), fbuf.pixel(3, 4))
 
     # scroll
     fbuf.fill(0x0000)

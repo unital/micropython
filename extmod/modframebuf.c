@@ -59,9 +59,9 @@ typedef struct _mp_framebuf_p_t {
 // constants for formats
 #define FRAMEBUF_MVLSB     (0)
 #define FRAMEBUF_RGB565    (1)
+#define FRAMEBUF_RGB565_BS (9)
 #define FRAMEBUF_RGB565_BE (7)
 #define FRAMEBUF_RGB565_LE (8)
-#define FRAMEBUF_RGB565_BS (9)
 #define FRAMEBUF_GS2_HMSB  (5)
 #define FRAMEBUF_GS4_HMSB  (2)
 #define FRAMEBUF_GS8       (6)
@@ -144,7 +144,7 @@ static void rgb565_fill_rect(const mp_obj_framebuf_t *fb, unsigned int x, unsign
 }
 
 static uint16_t bs16(uint16_t x) {
-    return (x >> 8) | (x << 8);
+    return (x >> 8) | ((x & 0xff) << 8);
 }
 
 static void rgb565_non_native_setpixel(const mp_obj_framebuf_t *fb, unsigned int x, unsigned int y, uint32_t col) {
