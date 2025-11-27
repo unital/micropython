@@ -311,41 +311,32 @@ static void setpixel(const mp_obj_framebuf_t *fb, mp_int_t x, mp_int_t y, uint32
         return;
     } else if (alpha < 0xff) {
         uint16_t pix_col = formats[fb->format].getpixel(fb, x, y);
-        // for RGB565
-        uint16_t col16 = col & 0xFFFF;
-        urgb565 pix_col_struct = *(urgb565 *)&pix_col;
-        urgb565 col_struct = *(urgb565 *)&col16;
+        uint16_t col16 = col;
+        urgb565 pix_col_struct;
+        urgb565 col_struct;
         switch (fb->format) {
-            case FRAMEBUF_RGB565:
-            case FRAMEBUF_RGB565_BE:
-            case FRAMEBUF_RGB565_LE:
-                col16 = col & 0xFFFF;
-                pix_col_struct = *(urgb565 *)&pix_col;
-                col_struct = *(urgb565 *)&col16;
-                col_struct.rgb.r = alpha_blend(pix_col_struct.rgb.r, col_struct.rgb.r, alpha);
-                col_struct.rgb.g = alpha_blend(pix_col_struct.rgb.g, col_struct.rgb.g, alpha);
-                col_struct.rgb.b = alpha_blend(pix_col_struct.rgb.b, col_struct.rgb.b, alpha);
-                col_struct.rgb.r = MIN(col_struct.rgb.r, 0b11111);
-                col_struct.rgb.g = MIN(col_struct.rgb.g, 0b111111);
-                col_struct.rgb.b = MIN(col_struct.rgb.b, 0b11111);
-                col = *(uint16_t *)&col_struct;
-                break;
             case FRAMEBUF_RGB565_BS:
                 // The colors are specified in non-native endianness in Python.
                 // We need to byteswap to get native endianness.
-                col16 = __builtin_bswap16(col & 0xFFFF);
+                col16 = __builtin_bswap16(col);
                 pix_col = __builtin_bswap16(pix_col);
+                // fall through to other RGB cases...
+            case FRAMEBUF_RGB565:
+            case FRAMEBUF_RGB565_BE:
+            case FRAMEBUF_RGB565_LE:
+                // convert to bit-packed rgb struct
                 pix_col_struct = *(urgb565 *)&pix_col;
                 col_struct = *(urgb565 *)&col16;
+                // blend channels
                 col_struct.rgb.r = alpha_blend(pix_col_struct.rgb.r, col_struct.rgb.r, alpha);
                 col_struct.rgb.g = alpha_blend(pix_col_struct.rgb.g, col_struct.rgb.g, alpha);
                 col_struct.rgb.b = alpha_blend(pix_col_struct.rgb.b, col_struct.rgb.b, alpha);
-                col_struct.rgb.r = MIN(col_struct.rgb.r, 0b11111);
-                col_struct.rgb.g = MIN(col_struct.rgb.g, 0b111111);
-                col_struct.rgb.b = MIN(col_struct.rgb.b, 0b11111);
+                // convert back to int
                 col = *(uint16_t *)&col_struct;
-                // And byteswap back to get non-native endianness.
-                col = __builtin_bswap16(col);
+                if (fb->format == FRAMEBUF_RGB565_BS) {
+                    // byteswap back to get non-native endianness for storage.
+                    col = __builtin_bswap16(col);
+                }
                 break;
             default:
                 col = alpha_blend(pix_col, col, alpha);

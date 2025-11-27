@@ -152,7 +152,7 @@ Other methods
     Shift the contents of the FrameBuffer by the given vector. This may
     leave a footprint of the previous colors in the FrameBuffer.
 
-.. method:: FrameBuffer.blit(fbuf, x, y, key=-1, palette=None, alpha=None)
+.. method:: FrameBuffer.blit(fbuf, x, y, key=-1, palette=None, alpha=0xFF)
 
     Draw another FrameBuffer on top of the current one at the given coordinates.
 
@@ -298,8 +298,10 @@ Constants
       ``MICROPY_PY_FRAMEBUF_ALPHA`` flag; or
 
     * replacing the use of ``RGB565`` format with the byte-swapped
-      ``RGB565_BS`` format.
+      ``RGB565_BS`` format; or
+
+    * using ``RGB565_BE`` or ``RGB565_LE`` as appropriate for the target
+      hardware and change color values to use native byte-order.
 
     New code which needs to support buffers of a particular byte-order should
-    simply use ``RGB565_BE`` or ``RGB565_LE`` as appropriate, and supply colors
-    in native RGB565 format.
+    use the last option.
