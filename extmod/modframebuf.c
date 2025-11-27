@@ -158,8 +158,11 @@ static uint32_t rgb565_non_native_getpixel(const mp_obj_framebuf_t *fb, unsigned
 }
 
 static void rgb565_non_native_fill_rect(const mp_obj_framebuf_t *fb, unsigned int x, unsigned int y, unsigned int w, unsigned int h, uint32_t col) {
+    printf("%u\n", col);
     uint16_t col16 = col & 0xffff;
+    printf("%u\n", col16);
     col16 = bs16(col16);
+    printf("%u\n", col16);
     uint16_t *b = &((uint16_t *)fb->buf)[x + y * fb->stride];
     while (h--) {
         for (unsigned int ww = w; ww; --ww) {
