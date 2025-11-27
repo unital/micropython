@@ -963,8 +963,6 @@ static mp_obj_t framebuf_poly(size_t n_args, const mp_obj_t *args_in) {
         mp_int_t py1 = y + poly_int(&bufinfo, 2 * n_poly - 1);
         mp_int_t y_start = py1;
         mp_int_t y_end = py1 + 1;
-        mp_int_t x_start = px1;
-        mp_int_t x_end = px1;
         for (int i = 0; i < n_poly; ++i) {
             mp_int_t px2 = x + poly_int(&bufinfo, 2 * i);
             mp_int_t py2 = y + poly_int(&bufinfo, 2 * i + 1);
@@ -972,8 +970,6 @@ static mp_obj_t framebuf_poly(size_t n_args, const mp_obj_t *args_in) {
             // track the min and max extent of the polygon
             y_start = MIN(y_start, py2);
             y_end = MAX(y_end, py2 + 1);
-            x_start = MIN(x_start, px2);
-            x_end = MAX(x_end, px2);
 
             if (py1 < py2) {
                 // going up
