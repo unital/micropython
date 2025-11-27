@@ -315,15 +315,16 @@ static void setpixel(const mp_obj_framebuf_t *fb, mp_int_t x, mp_int_t y, uint32
         urgb565 pix_col_struct;
         urgb565 col_struct;
         switch (fb->format) {
-            case FRAMEBUF_RGB565_BS:
-                // The colors are specified in non-native endianness in Python.
-                // We need to byteswap to get native endianness.
-                col16 = __builtin_bswap16(col);
-                pix_col = __builtin_bswap16(pix_col);
-            // fall through to other RGB cases...
             case FRAMEBUF_RGB565:
+            case FRAMEBUF_RGB565_BS:
             case FRAMEBUF_RGB565_BE:
             case FRAMEBUF_RGB565_LE:
+                if (fb->format == FRAMEBUF_RGB565_BS) {
+                    // The colors are specified in non-native endianness in Python.
+                    // We need to byteswap to get native endianness.
+                    col16 = __builtin_bswap16(col);
+                    pix_col = __builtin_bswap16(pix_col);
+                }
                 // convert to bit-packed rgb struct
                 pix_col_struct = *(urgb565 *)&pix_col;
                 col_struct = *(urgb565 *)&col16;
