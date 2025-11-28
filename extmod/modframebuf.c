@@ -59,9 +59,8 @@ typedef struct _mp_framebuf_p_t {
 // constants for formats
 #define FRAMEBUF_MVLSB     (0)
 #define FRAMEBUF_RGB565    (1)
-#define FRAMEBUF_RGB565_BE (7)
-#define FRAMEBUF_RGB565_LE (8)
-#define FRAMEBUF_RGB565_BS (9)
+#define FRAMEBUF_RGB565_NN (7)
+#define FRAMEBUF_RGB565_BS (8)
 #define FRAMEBUF_GS2_HMSB  (5)
 #define FRAMEBUF_GS4_HMSB  (2)
 #define FRAMEBUF_GS8       (6)
@@ -262,13 +261,7 @@ static mp_framebuf_p_t formats[] = {
     [FRAMEBUF_MVLSB] = {mvlsb_setpixel, mvlsb_getpixel, mvlsb_fill_rect},
     [FRAMEBUF_RGB565] = {rgb565_setpixel, rgb565_getpixel, rgb565_fill_rect},
     [FRAMEBUF_RGB565_BS] = {rgb565_setpixel, rgb565_getpixel, rgb565_fill_rect},
-    #if MP_ENDIANNESS_LITTLE
-    [FRAMEBUF_RGB565_LE] = {rgb565_setpixel, rgb565_getpixel, rgb565_fill_rect},
-    [FRAMEBUF_RGB565_BE] = {rgb565_non_native_setpixel, rgb565_non_native_getpixel, rgb565_non_native_fill_rect},
-    #else // MP_ENDIANNESS_LITTLE
-    [FRAMEBUF_RGB565_BE] = {rgb565_setpixel, rgb565_getpixel, rgb565_fill_rect},
-    [FRAMEBUF_RGB565_LE] = {rgb565_non_native_setpixel, rgb565_non_native_getpixel, rgb565_non_native_fill_rect},
-    #endif // MP_ENDIANNESS_LITTLE
+    [FRAMEBUF_RGB565_NN] = {rgb565_non_native_setpixel, rgb565_non_native_getpixel, rgb565_non_native_fill_rect},
     [FRAMEBUF_GS2_HMSB] = {gs2_hmsb_setpixel, gs2_hmsb_getpixel, gs2_hmsb_fill_rect},
     [FRAMEBUF_GS4_HMSB] = {gs4_hmsb_setpixel, gs4_hmsb_getpixel, gs4_hmsb_fill_rect},
     [FRAMEBUF_GS8] = {gs8_setpixel, gs8_getpixel, gs8_fill_rect},
@@ -317,8 +310,7 @@ static void setpixel(const mp_obj_framebuf_t *fb, mp_int_t x, mp_int_t y, uint32
         switch (fb->format) {
             case FRAMEBUF_RGB565:
             case FRAMEBUF_RGB565_BS:
-            case FRAMEBUF_RGB565_BE:
-            case FRAMEBUF_RGB565_LE:
+            case FRAMEBUF_RGB565_NN:
                 if (fb->format == FRAMEBUF_RGB565_BS) {
                     // The colors are specified in non-native endianness in Python.
                     // We need to byteswap to get native endianness.
@@ -450,8 +442,7 @@ static mp_obj_t framebuf_make_new_helper(size_t n_args, const mp_obj_t *args_in,
             break;
         case FRAMEBUF_RGB565:
         case FRAMEBUF_RGB565_BS:
-        case FRAMEBUF_RGB565_BE:
-        case FRAMEBUF_RGB565_LE:
+        case FRAMEBUF_RGB565_NN:
             bpp = 16;
             break;
         default:
@@ -1476,8 +1467,13 @@ static const mp_rom_map_elem_t framebuf_module_globals_table[] = {
     { MP_ROM_QSTR(MP_QSTR_MONO_VLSB), MP_ROM_INT(FRAMEBUF_MVLSB) },
     { MP_ROM_QSTR(MP_QSTR_RGB565), MP_ROM_INT(FRAMEBUF_RGB565) },
     { MP_ROM_QSTR(MP_QSTR_RGB565_BS), MP_ROM_INT(FRAMEBUF_RGB565_BS) },
-    { MP_ROM_QSTR(MP_QSTR_RGB565_BE), MP_ROM_INT(FRAMEBUF_RGB565_BE) },
-    { MP_ROM_QSTR(MP_QSTR_RGB565_LE), MP_ROM_INT(FRAMEBUF_RGB565_LE) },
+    #if MP_ENDIANNESS_LITTLE
+    { MP_ROM_QSTR(MP_QSTR_RGB565_LE), MP_ROM_INT(FRAMEBUF_RGB565) },
+    { MP_ROM_QSTR(MP_QSTR_RGB565_BE), MP_ROM_INT(FRAMEBUF_RGB565_NN) },
+    #else // MP_ENDIANNESS_LITTLE
+    { MP_ROM_QSTR(MP_QSTR_RGB565_LE), MP_ROM_INT(FRAMEBUF_RGB565_NN) },
+    { MP_ROM_QSTR(MP_QSTR_RGB565_BE), MP_ROM_INT(FRAMEBUF_RGB565) },
+    #endif // MP_ENDIANNESS_LITTLE
     { MP_ROM_QSTR(MP_QSTR_GS2_HMSB), MP_ROM_INT(FRAMEBUF_GS2_HMSB) },
     { MP_ROM_QSTR(MP_QSTR_GS4_HMSB), MP_ROM_INT(FRAMEBUF_GS4_HMSB) },
     { MP_ROM_QSTR(MP_QSTR_GS8), MP_ROM_INT(FRAMEBUF_GS8) },
